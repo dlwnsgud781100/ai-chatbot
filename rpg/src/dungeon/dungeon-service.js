@@ -1,0 +1,16 @@
+import { EVENT } from '../core/constants.js';
+import { DUNGEONS } from '../data/rpg-content.js';
+
+const STATES=Object.freeze({NOT_STARTED:'NotStarted',ENTERED:'Entered',ELITE_DEFEATED:'EliteDefeated',BOSS_DEFEATED:'BossDefeated',COMPLETED:'Completed'});
+/** Owns dungeon admission/progression only; SpawnManager asks it which gated spawns may exist. */
+export class DungeonService {
+  constructor({events,player,quests,world,saved={}}){this.events=events;this.player=player;this.quests=quests;this.world=world;this.states={};for(const id of Object.keys(DUNGEONS)){const savedState=saved[id]?.state;this.states[id]=Object.values(STATES).includes(savedState)?savedState:STATES.NOT_STARTED;}world.spawns.setAvailability((definition)=>this.allowsSpawn(definition));events.on(EVENT.ENEMY_DEFEATED,({enemy})=>this.onEnemyDefeated(enemy));}
+  state(id){return this.states[id]??STATES.NOT_STARTED;}
+  requirements(id){const dungeon=DUNGEONS[id];if(!dungeon)return {ok:false,reason:'알 수 없는 던전입니다.'};const req=dungeon.entryRequirements;if(this.player.stats.level<req.minLevel)return {ok:false,reason:`레벨 ${req.minLevel} 이상이 필요합니다.`};if(!this.player.hasUnlock(req.unlock))return {ok:false,reason:'이 던전으로 가는 길이 아직 열리지 않았습니다.'};if(!this.quests.isActive(req.questId)&&!this.quests.isReady(req.questId))return {ok:false,reason:'관련 의뢰를 먼저 수락해야 합니다.'};return {ok:true};}
+  enter(id){const dungeon=DUNGEONS[id],check=this.requirements(id);if(!check.ok){this.events.emit(EVENT.NOTIFY,{message:check.reason,type:'warning'});return false;}if(this.state(id)===STATES.COMPLETED)return this.fail('이미 정화한 던전입니다.');if(this.state(id)===STATES.NOT_STARTED){this.states[id]=STATES.ENTERED;this.quests.advance('EnterDungeon',id);this.events.emit(EVENT.DUNGEON_CHANGED,{id,state:this.states[id],dungeon});}this.world.teleport(this.player,dungeon.entryPosition,{notify:false});this.world.refreshSpawns();this.events.emit(EVENT.NOTIFY,{message:`${dungeon.name}에 진입했습니다. 정예를 처치해 심장부를 여십시오.`,type:'warning'});return true;}
+  allowsSpawn(definition){for(const dungeon of Object.values(DUNGEONS)){if(definition.id===dungeon.eliteSpawnId)return this.state(dungeon.id)===STATES.ENTERED;if(definition.id===dungeon.bossSpawnId)return this.state(dungeon.id)===STATES.ELITE_DEFEATED;}return true;}
+  onEnemyDefeated(enemy){if(!enemy?.definition?.id)return;for(const dungeon of Object.values(DUNGEONS)){const current=this.state(dungeon.id);if(enemy.definition.id===dungeon.eliteSpawnId&&current===STATES.ENTERED){this.states[dungeon.id]=STATES.ELITE_DEFEATED;this.world.refreshSpawns();this.events.emit(EVENT.DUNGEON_CHANGED,{id:dungeon.id,state:this.states[dungeon.id],dungeon});this.events.emit(EVENT.NOTIFY,{message:'정예를 돌파했습니다. 아우렐이 깨어납니다.',type:'success'});}else if(enemy.definition.id===dungeon.bossSpawnId&&current===STATES.ELITE_DEFEATED){this.states[dungeon.id]=STATES.BOSS_DEFEATED;this.events.emit(EVENT.DUNGEON_CHANGED,{id:dungeon.id,state:this.states[dungeon.id],dungeon});this.events.emit('dungeon:completed',{dungeon});this.states[dungeon.id]=STATES.COMPLETED;this.events.emit(EVENT.DUNGEON_CHANGED,{id:dungeon.id,state:this.states[dungeon.id],dungeon});}}}
+  fail(message){this.events.emit(EVENT.NOTIFY,{message,type:'warning'});return false;}
+  snapshot(){return Object.fromEntries(Object.keys(DUNGEONS).map((id)=>[id,{state:this.state(id)}]));}
+}
+export { STATES as DUNGEON_STATES };

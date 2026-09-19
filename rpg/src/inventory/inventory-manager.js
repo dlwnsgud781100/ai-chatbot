@@ -1,11 +1,31 @@
 import { EVENT } from '../core/constants.js';
-import { ITEMS } from '../data/content.js';
+import { ITEM_DATABASE } from '../data/rpg-content.js';
+
+const clone=(value)=>JSON.parse(JSON.stringify(value));
+/** Slot inventory stores only item IDs/instance IDs; item definitions remain immutable database data. */
 export class InventoryManager {
-  constructor(events, saved={}) { this.events=events; this.items=new Map(Object.entries(saved.items ?? {dew_vial:2,verdant_shard:0,ember_dust:0})); }
-  quantity(itemId) { return Number(this.items.get(itemId) ?? 0); }
-  add(itemId, quantity=1) { if(!ITEMS[itemId]||quantity<=0) return false; this.items.set(itemId,this.quantity(itemId)+quantity); this.changed(); return true; }
-  remove(itemId, quantity=1) { if(this.quantity(itemId)<quantity||quantity<=0) return false; const next=this.quantity(itemId)-quantity; if(next===0)this.items.delete(itemId);else this.items.set(itemId,next); this.changed(); return true; }
-  list() { return [...this.items.entries()].filter(([,quantity])=>quantity>0).map(([id,quantity])=>({item:ITEMS[id],quantity})); }
-  snapshot() { return {items:Object.fromEntries(this.items)}; }
-  changed() { this.events.emit(EVENT.INVENTORY_CHANGED,{inventory:this}); }
+  constructor(events,saved={}){this.events=events;const requestedCapacity=Number(saved.capacity??30);this.capacity=Number.isSafeInteger(requestedCapacity)?Math.max(10,Math.min(120,requestedCapacity)):30;this.sequence=Number.isSafeInteger(saved.sequence)&&saved.sequence>=0?saved.sequence:0;this.slots=Array(this.capacity).fill(null);if(Array.isArray(saved.slots)){saved.slots.slice(0,this.capacity).forEach((entry,index)=>{const item=ITEM_DATABASE[entry?.itemId],quantity=entry?.quantity;if(item&&Number.isSafeInteger(quantity)&&quantity>0&&quantity<=(item.stackLimit??1))this.slots[index]={instanceId:typeof entry.instanceId==='string'&&entry.instanceId.length<=100?entry.instanceId:this.nextId(),itemId:entry.itemId,quantity};});}else{for(const [itemId,quantity] of Object.entries(saved.items??{dew_vial:2,verdant_shard:0,ember_dust:0}))this.add(itemId,quantity,{silent:true});}this.lastError=null;}
+  nextId(){this.sequence++;return `itm-${Date.now().toString(36)}-${this.sequence}`;}
+  definition(itemId){return ITEM_DATABASE[itemId]??null;}
+  quantity(itemId){return this.slots.reduce((total,entry)=>total+(entry?.itemId===itemId?entry.quantity:0),0);}
+  isFull(){return this.slots.every(Boolean);}
+  firstEmpty(){return this.slots.findIndex((entry)=>!entry);}
+  find(instanceId){const index=this.slots.findIndex((entry)=>entry?.instanceId===instanceId);return index<0?null:{index,entry:this.slots[index],item:this.definition(this.slots[index].itemId)};}
+  findFirst(itemId){const index=this.slots.findIndex((entry)=>entry?.itemId===itemId);return index<0?null:this.find(this.slots[index].instanceId);}
+  add(itemId,quantity=1,{silent=false}={}){const item=this.definition(itemId);if(!item||!Number.isSafeInteger(quantity)||quantity<=0)return this.fail('Invalid item or quantity',silent);const stackLimit=item.stackLimit??1;const freeCapacity=this.slots.reduce((total,entry)=>total+(!entry?stackLimit:entry.itemId===itemId?Math.max(0,stackLimit-entry.quantity):0),0);if(quantity>freeCapacity)return this.fail('Inventory full',silent);let remaining=quantity;if(stackLimit>1){ for(const entry of this.slots){if(!entry||entry.itemId!==itemId||entry.quantity>=stackLimit)continue;const moved=Math.min(remaining,stackLimit-entry.quantity);entry.quantity+=moved;remaining-=moved;if(remaining===0)break;}}while(remaining>0){const index=this.firstEmpty();if(index<0)return this.fail('Inventory full',silent);const added=Math.min(remaining,stackLimit);this.slots[index]={instanceId:this.nextId(),itemId,quantity:added};remaining-=added;}this.changed();return true;}
+  remove(itemId,quantity=1,{silent=false}={}){if(!Number.isSafeInteger(quantity)||quantity<=0||this.quantity(itemId)<quantity)return this.fail('Insufficient item quantity',silent);let remaining=quantity;for(let index=this.slots.length-1;index>=0&&remaining>0;index--){const entry=this.slots[index];if(!entry||entry.itemId!==itemId)continue;const taken=Math.min(entry.quantity,remaining);entry.quantity-=taken;remaining-=taken;if(entry.quantity===0)this.slots[index]=null;}this.changed();return true;}
+  removeInstance(instanceId,quantity=1,{silent=false}={}){const found=this.find(instanceId);if(!found||!Number.isSafeInteger(quantity)||quantity<=0||found.entry.quantity<quantity)return this.fail('Invalid inventory instance',silent);found.entry.quantity-=quantity;const removed={...found.entry,quantity};if(found.entry.quantity===0)this.slots[found.index]=null;this.changed();return removed;}
+  move(from,to){if(!this.validIndex(from)||!this.validIndex(to)||from===to)return false;const source=this.slots[from],target=this.slots[to];if(!source)return false;if(target?.itemId===source.itemId){const item=this.definition(source.itemId),space=(item.stackLimit??1)-target.quantity;if(space<=0)return false;const moved=Math.min(space,source.quantity);target.quantity+=moved;source.quantity-=moved;if(source.quantity===0)this.slots[from]=null;}else [this.slots[from],this.slots[to]]=[target,source];this.changed();return true;}
+  split(instanceId,quantity){const found=this.find(instanceId);if(!found||!Number.isSafeInteger(quantity)||quantity<=0||quantity>=found.entry.quantity)return false;const index=this.firstEmpty();if(index<0)return false;found.entry.quantity-=quantity;this.slots[index]={instanceId:this.nextId(),itemId:found.entry.itemId,quantity};this.changed();return true;}
+  merge(from,to){return this.move(from,to);}
+  sort(){const entries=this.slots.filter(Boolean).sort((a,b)=>{const ai=this.definition(a.itemId),bi=this.definition(b.itemId);return ai.type.localeCompare(bi.type)||ai.rarity.localeCompare(bi.rarity)||ai.name.localeCompare(bi.name);});this.slots=[...entries,...Array(this.capacity-entries.length).fill(null)];this.changed();}
+  filter(category='all'){return this.entries().filter(({item})=>category==='all'||item.type===category||(category==='equipment'&&item.type==='equipment'));}
+  entries(){return this.slots.map((entry,index)=>entry?{index,entry,item:this.definition(entry.itemId)}:null).filter(Boolean);}
+  list(){const grouped=new Map();for(const {item,entry} of this.entries()){const current=grouped.get(item.id)??{item,quantity:0};current.quantity+=entry.quantity;grouped.set(item.id,current);}return [...grouped.values()];}
+  use(instanceId){const found=this.find(instanceId);if(!found||found.item.type!=='consumable')return null;const effect=clone(found.item.effects??{});if(!this.removeInstance(instanceId,1))return null;return effect;}
+  addEntry(entry,{silent=false}={}){if(!entry||!this.definition(entry.itemId))return false;return this.add(entry.itemId,entry.quantity,{silent});}
+  validIndex(index){return Number.isInteger(index)&&index>=0&&index<this.capacity;}
+  fail(message,silent){this.lastError=message;if(!silent)this.events.emit(EVENT.NOTIFY,{message,type:'warning'});return false;}
+  changed(){this.events.emit(EVENT.INVENTORY_CHANGED,{inventory:this});}
+  snapshot(){return {capacity:this.capacity,sequence:this.sequence,slots:this.slots.map((entry)=>entry?{...entry}:null)};}
 }

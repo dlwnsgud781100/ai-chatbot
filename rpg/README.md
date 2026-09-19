@@ -1,6 +1,6 @@
-# Ashenwild Frontier — 3D Action RPG Foundation
+# Ashenwild Frontier — Browser Action RPG Vertical Slice
 
-An original, browser-playable third-person action RPG foundation. It intentionally uses no art, maps, UI layouts, characters, or game logic from the archived prototype in this repository; every scene object is procedural geometry and the content/data is new.
+Ashenwild Frontier is an original, browser-playable third-person action RPG foundation. It does not copy the archived prototype's UI, maps, characters, icons, or gameplay logic: scenes use procedural geometry and the Phase-4 content is authored specifically for this project.
 
 ## Run
 
@@ -11,62 +11,63 @@ python3 rpg_server.py
 # Open http://localhost:8000
 ```
 
-The command exposes both the static client and a small demo intent gateway at `/api`. No packages are required. The renderer imports Three.js from jsDelivr; an internet connection is required for that one browser dependency.
+The dependency-free host serves the client and a validated `/api/action` intent gateway. Three.js remains a CDN browser dependency.
 
 ## Controls
 
-| Action | Keyboard / mouse |
+| Action | Keys |
 | --- | --- |
-| Move | `WASD` / arrow keys |
-| Sprint / dash | hold / tap `Left Shift` |
-| Jump / air attack | `Space` / `Space + 1` |
-| Light combo | left mouse button / `1` |
-| Heavy attack / Rift Lance | `2` / `3` |
-| Dew vial | `4` |
-| Dodge / guard-parry | `Q` / `F` |
-| Target lock / cycle | `R` / `T` |
-| Ultimate | `V` at 100% Resolve |
-| Interact / dialogue | `E` |
-| Inventory / quests / character | `I` / `J` / `C` |
-| World map / fast travel | `M` |
-| Menu | `Esc` |
-| Developer telemetry | `F3` (or `?debug`) |
+| Move / sprint | `WASD` or arrows / `Left Shift` |
+| Light combo, heavy, Rift Lance | mouse / `1`, `2`, `3` |
+| Dew vial, dodge, guard/parry | `4`, `Q`, `F` |
+| Target lock / cycle / ultimate | `R`, `T`, `V` |
+| Interact / dialogue choices | `E`, then click a choice |
+| Inventory / quest log / character | `I` / `J` / `C` |
+| Map / fast travel | `M` |
+| Menu / debug | `Esc` / `F3` |
 
-## Technical map
+## Playable Phase-4 loop
+
+1. Speak with **Watcher Arin** at the Worldroot Plaza and accept the Thornwatch hunt.
+2. Defeat five Thornwalkers in the field. Combat emits confirmed defeat events; reward, quest, dungeon, and progression systems subscribe independently.
+3. Report to Arin for XP, Gold, a real equipment reward, and the Sanctum unlock. Use inventory/equipment controls to equip, consume, sort, filter, split/merge (API), or move items.
+4. Visit **Blacksmith Brann** for a functional Rootforge buy/sell shop and his collection quest.
+5. Accept Arin's Sanctum quest. At level 2, enter the Skywell Gate near `(20, -16)` using `E`.
+6. The dungeon gate validates level, quest, and unlocks. Defeat its gated Root Warden elite, then Aurel; report back for the final quest reward and Emberfall world unlock.
+7. Reload the page: version-2 save migration/validation restores stats, inventory/equipment IDs, Gold, quest state, world navigation, defeats, and dungeon state.
+
+## Architecture
 
 ```text
 src/
-  core/        bootstrap, state machine, event bus, service container, config
-  data/        declarative zones, NPCs, enemies, quests, skills, items
-  player/      controller, data, stats, semantic animation, interaction
-  combat/      action timeline, hit detection, targeting, AI, damage, feedback, status effects
-  world/       zone packages, chunk streaming, navigation, spawning, NPC, resources, environment
-  quest/       objective progress and reward progression
-  inventory/   inventory, equipment seam, and loot rolls
-  ui/          HUD, modal menus, dialogue, notifications
-  save/        versioned local save and defensive validation
-  network/     client intent gateway and shared input contract
-  admin/       performance monitor and developer telemetry
-  renderer/    Three.js presentation adapter
+  data/rpg-content.js   immutable Phase-4 items, loot, quests, NPCs, shops, dungeon
+  player/               base/modifier/derived CharacterStats and persistent PlayerData
+  inventory/            slot inventory, equipment bridge, weighted loot planner
+  rewards/              event-driven reward application
+  economy/              catalog-resolved shop transactions
+  quest/                available/active/ready/completed state machine
+  dungeon/              authored Sanctum entry and elite/boss gate
+  combat/               preserved action combat, hit detection, feedback, AI
+  world/                streaming, NPC/resource interaction, gated spawns
+  save/                 v1→v2 validation/migration
+  ui/                   HUD, live modals, dialogue choices
+  network/              restrictive intent contract and remote adapter
 ```
 
-`GameBootstrap` is the composition root. Gameplay services do not query the DOM or Three.js directly except through the renderer adapter at that edge. Content IDs live in `src/data/content.js`; adding a standard monster/item/quest should not require modifying the combat or quest engine.
+`GameBootstrap` is the composition root. `CombatService` only emits an enemy-defeated event; it does not award XP, Gold, drops, quest credit, or dungeon completion itself. Combat-compatible stat aliases are retained so the Phase-3 combat flow is not replaced.
 
-## Authority boundary
+## Documentation
 
-The included Python server is a **demo intent gateway**, not an online-production server. It validates payload sizes, intent names, movement vectors, action rates, and combat identifier shape, and is deliberately kept separate from UI/client code. A production server must add authenticated accounts, authoritative per-player entity state, spatial validation, server-side cooldown/resource checks, persistence, telemetry, and anti-replay tokens before multiplayer is enabled. The client uses prediction in the offline field demo and treats the gateway as a replaceable `RemoteClient` endpoint.
+- [Progression](./PROGRESSION.md)
+- [Inventory](./INVENTORY.md)
+- [Equipment](./EQUIPMENT.md)
+- [Quests & NPCs](./QUESTS.md)
+- [Dungeon](./DUNGEONS.md)
+- [Economy](./ECONOMY.md)
+- [Combat](./COMBAT.md) and [World](./WORLD.md)
 
-## Save format
+## Authority and known boundaries
 
-The single-player demo stores a versioned save in `localStorage` under `ashenwild-frontier.save`. `DataValidation` clamps and rejects malformed values before loading it. The menu can clear this test save.
+The Python endpoint rejects client-supplied damage, XP, Gold, items, loot, quest, and equipment-stat fields; it is an intent gateway, not a full online game server. The included single-player browser loop is still an offline local simulation, so browser state/localStorage is not anti-cheat secure. `RewardService` and `RemoteClient` are deliberately narrow seams for a future authenticated server that resolves rewards, persistence, spatial state, cooldowns, and reconciliation.
 
-## Current vertical slice
-
-- A data-driven 10-zone open-world topology centred on the Worldroot Plaza and its World Tree hub.
-- Streamed 48×48 chunks, terrain/material variants, environmental profiles, local resources, NPCs, enemies, boss markers, landmarks, dungeon gates, POIs, and waypoint data.
-- Mini map, zone discovery, world map, waypoint activation, and discovered-waypoint fast travel. See [WORLD.md](./WORLD.md) for the zone manifest and lifecycle.
-- A real-time action combat slice: three-step light combo, heavy attack, lightning skill, dodge, dash, guard/perfect parry, target lock/cycling, air attack, Resolve ultimate, knockback, stun, stagger, damage types, status effects, hit-stop, camera shake, VFX, and synthesized impact cues.
-- Three nearby normal archetypes, Root Warden elite, and the staged Thornheart Guardian boss. See [COMBAT.md](./COMBAT.md) for controls and encounter behavior.
-- XP/levels, item drops, inventory, quest objectives/rewards, dialogue interaction, versioned local saving, HUD, responsive touch affordances, debug panel, and gateway health/action calls.
-
-This remains a deliberately bounded vertical slice. Dungeon instance generation, full equipment slots, authoritative multiplayer simulation, mobile gesture movement, streamed production audio, accessibility settings, and production asset streaming are planned extensions rather than placeholder systems disguised as complete features.
+No browser automation/WebGL runtime is bundled in this checkout. Run the deterministic system-flow coverage with `node --experimental-default-type=module rpg/tests/phase4-rpg-flow.mjs`; it covers progression, inventory/equipment, weighted loot, quests, dungeon gates, shop transactions, save migration/reload, and invalid reward/item/quantity attempts. Static module checks and HTTP authority/asset checks complement it.

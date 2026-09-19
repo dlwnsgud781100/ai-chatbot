@@ -33,3 +33,28 @@ Phase 3 preserves the existing `CombatService` boundary and extends it with decl
 2. Implement a real authoritative simulation service with account/session identity, persistence, spatial queries, server-side damage/cooldowns, snapshots, and reconciliation.
 3. Add zone streaming plus instance/dungeon contracts, then a boss encounter state machine.
 4. Add equipment stats, NPC dialogue graph tooling, localization, audio, accessibility, analytics, automated gameplay tests, asset pipeline, and live-ops configuration.
+
+## Phase 4 extension: RPG vertical loop
+
+Phase 4 keeps Phase 3 combat intact and adds a content-driven gameplay layer in `rpg/src/data/rpg-content.js`. The composition root now wires seven focused services rather than making combat a reward God Object:
+
+- `CharacterStats` owns base attributes, source-keyed modifiers, derived combat-compatible aliases, XP/level progression, and skill-readiness state.
+- `InventoryManager` owns bounded ID/instance slots; `EquipmentManager` moves real instances into seven slots and applies modifier sources.
+- `LootSystem` creates validated weighted drop plans; `RewardService` subscribes to defeat, quest-turn-in, dungeon-complete, and resource events to apply configured reward records.
+- `QuestManager` tracks the available/active/ready/completed state machine; `NPCManager` exposes dialogue choices that request accept/turn-in/shop operations.
+- `ShopService` resolves catalog prices and sell rules from immutable content, never from UI values.
+- `DungeonService` validates Sanctum entry and tells `SpawnManager` whether its elite/boss encounter spawns are eligible.
+- `SaveManager` writes version 2 snapshots; `data-validation.js` migrates the old map inventory and clamps/filters untrusted browser storage.
+
+The data/event shape is intentionally server-compatible: network action intents allow identifiers only. XP, Gold, inventory item IDs/quantities, loot, quest completion, and equipment modifiers are absent from the wire contract and the Python gateway rejects unexpected fields. The offline demo remains a local simulation; an authoritative production service must replace the `RewardService` resolution seam and retain account/session state server-side.
+
+### Event flow
+
+```text
+CombatService -- combat:enemy-defeated --> RewardService / QuestManager / DungeonService
+QuestManager -- quest:turn-in -----------> RewardService
+DungeonService -- dungeon:completed -----> RewardService
+RewardService -- player:progress --------> HUD / save / modal UI
+```
+
+This fan-out preserves low coupling: combat knows hit/death presentation, while progression systems independently respond to outcomes.

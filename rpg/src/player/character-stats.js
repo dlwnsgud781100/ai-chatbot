@@ -1,9 +1,21 @@
+const BASE_DEFAULT={strength:3,vitality:3,dexterity:2,intelligence:1};
+const DERIVED_DEFAULT={maxHealth:120,maxEnergy:80,attack:12,defense:3,critChance:.05,critDamage:1.5,moveSpeed:0,skillPower:0,elementalPower:{},resistance:{}};
+const clone=(value)=>JSON.parse(JSON.stringify(value));
+
+/** Central stat authority. Combat reads only its derived fields, never equipment directly. */
 export class CharacterStats {
-  constructor(data={}) { this.level=data.level ?? 1; this.xp=data.xp ?? 0; this.xpToLevel=data.xpToLevel ?? 100; this.maxHealth=data.maxHealth ?? 120; this.health=Math.min(data.health ?? this.maxHealth,this.maxHealth); this.maxEnergy=data.maxEnergy ?? 80; this.energy=Math.min(data.energy ?? this.maxEnergy,this.maxEnergy); this.attack=data.attack ?? 12; this.defense=data.defense ?? 3; }
-  heal(value) { const before=this.health; this.health=Math.min(this.maxHealth,this.health+Math.max(0,value)); return this.health-before; }
-  spendEnergy(value) { if (this.energy<value) return false; this.energy-=value; return true; }
-  restoreEnergy(value) { this.energy=Math.min(this.maxEnergy,this.energy+value); }
-  takeDamage(value) { const amount=Math.max(1,Math.round(value)); this.health=Math.max(0,this.health-amount); return amount; }
-  gainXp(value) { this.xp+=Math.max(0,value); const levels=[]; while(this.xp>=this.xpToLevel) { this.xp-=this.xpToLevel; this.level++; this.xpToLevel=Math.round(this.xpToLevel*1.27); this.maxHealth+=18; this.maxEnergy+=8; this.attack+=3; this.defense+=1; this.health=this.maxHealth; this.energy=this.maxEnergy; levels.push(this.level); } return levels; }
-  snapshot() { return { level:this.level,xp:this.xp,xpToLevel:this.xpToLevel,maxHealth:this.maxHealth,health:this.health,maxEnergy:this.maxEnergy,energy:this.energy,attack:this.attack,defense:this.defense }; }
+  constructor(data={}) {this.level=data.level??1;this.xp=data.xp??0;this.xpToLevel=data.xpToLevel??100;this.base={...BASE_DEFAULT,...(data.base??{})};this.modifiers=new Map();this.unlockedSkills=new Set(data.unlockedSkills??['light_1','light_2','light_3','heavy','rift','dodge','dash','potion']);this.health=data.health??data.maxHealth??120;this.energy=data.energy??data.maxEnergy??80;this.recalculate({preserveRatio:false});this.health=Math.min(this.health,this.maxHealth);this.energy=Math.min(this.energy,this.maxEnergy);}
+  setModifier(source,modifier={}){this.modifiers.set(source,clone(modifier));this.recalculate();}
+  removeModifier(source){if(this.modifiers.delete(source))this.recalculate();}
+  clearModifiers(prefix){for(const key of this.modifiers.keys())if(key.startsWith(prefix))this.modifiers.delete(key);this.recalculate();}
+  aggregate(){const total={strength:0,vitality:0,dexterity:0,intelligence:0,maxHealth:0,maxEnergy:0,attackPower:0,defense:0,critChance:0,critDamage:0,moveSpeed:0,skillPower:0,elementalPower:{},resistance:{}};for(const modifier of this.modifiers.values()){for(const [key,value] of Object.entries(modifier)){if(key==='elementalPower'||key==='resistance'){for(const [element,amount] of Object.entries(value??{}))total[key][element]=(total[key][element]??0)+Number(amount);continue;}if(key in total)total[key]+=Number(value)||0;}}return total;}
+  recalculate({preserveRatio=true}={}){const healthRatio=this.maxHealth?this.health/this.maxHealth:1,energyRatio=this.maxEnergy?this.energy/this.maxEnergy:1,mods=this.aggregate(),levelBonus=this.level-1;this.derived={maxHealth:Math.round(72+(this.base.vitality+mods.vitality)*16+levelBonus*14+mods.maxHealth),maxEnergy:Math.round(60+(this.base.intelligence+mods.intelligence)*10+(this.base.dexterity+mods.dexterity)*5+levelBonus*7+mods.maxEnergy),attack:Math.round(3+(this.base.strength+mods.strength)*3+levelBonus*2+mods.attackPower),defense:Math.round((this.base.vitality+mods.vitality)+levelBonus+mods.defense),critChance:Math.max(0,Math.min(.75,.04+(this.base.dexterity+mods.dexterity)*.012+mods.critChance)),critDamage:Math.max(1.25,1.5+mods.critDamage),moveSpeed:mods.moveSpeed,skillPower:mods.skillPower,elementalPower:mods.elementalPower,resistance:mods.resistance};Object.assign(this,this.derived);if(preserveRatio){this.health=Math.min(this.maxHealth,Math.max(1,Math.round(this.maxHealth*healthRatio)));this.energy=Math.min(this.maxEnergy,Math.max(0,Math.round(this.maxEnergy*energyRatio)));}}
+  heal(value){const before=this.health;this.health=Math.min(this.maxHealth,this.health+Math.max(0,value));return this.health-before;}
+  spendEnergy(value){if(this.energy<value)return false;this.energy-=value;return true;}
+  restoreEnergy(value){this.energy=Math.min(this.maxEnergy,this.energy+value);}
+  takeDamage(value){const amount=Math.max(1,Math.round(value));this.health=Math.max(0,this.health-amount);return amount;}
+  gainXp(value){this.xp+=Math.max(0,Math.round(value));const levels=[];while(this.xp>=this.xpToLevel){this.xp-=this.xpToLevel;this.level++;this.xpToLevel=Math.round(this.xpToLevel*1.24+18);this.base.strength++;this.base.vitality++;if(this.level%2===0)this.base.dexterity++;if(this.level%3===0)this.base.intelligence++;if(this.level===2)this.unlockedSkills.add('ultimate');this.recalculate({preserveRatio:false});this.health=this.maxHealth;this.energy=this.maxEnergy;levels.push(this.level);}return levels;}
+  meetsLevel(required=1){return this.level>=required;}
+  snapshot(){return {level:this.level,xp:this.xp,xpToLevel:this.xpToLevel,base:clone(this.base),health:this.health,maxHealth:this.maxHealth,energy:this.energy,maxEnergy:this.maxEnergy,attack:this.attack,defense:this.defense,unlockedSkills:[...this.unlockedSkills]};}
+  derivedSnapshot(){return {...this.derived,base:clone(this.base)};}
 }

@@ -1,5 +1,15 @@
-import { ITEMS } from '../data/content.js';
+import { EVENT } from '../core/constants.js';
+import { ITEM_DATABASE } from '../data/rpg-content.js';
+
+export const EQUIPMENT_SLOTS=Object.freeze(['weapon','helmet','armor','gloves','boots','accessory','relic']);
+/** Moves real inventory instances into seven equipment slots and owns the stat-modifier bridge. */
 export class EquipmentManager {
-  constructor(player, inventory, events) { this.player=player;this.inventory=inventory;this.events=events; }
-  equip(itemId) { const item=ITEMS[itemId]; if(!item||item.type!=='weapon'||this.inventory.quantity(itemId)<1)return false; const previous=this.player.equipment.weapon; this.player.equipment.weapon=itemId; this.player.stats.attack+=item.attack??0; if(previous&&previous!==itemId) this.player.stats.attack-=ITEMS[previous]?.attack??0; this.events.emit('inventory:equipped',{itemId,previous}); return true; }
+  constructor(player,inventory,events){this.player=player;this.inventory=inventory;this.events=events;this.equipment={};for(const slot of EQUIPMENT_SLOTS){const stored=player.equipment?.[slot];const itemId=typeof stored==='string'?stored:stored?.itemId;if(itemId&&ITEM_DATABASE[itemId]?.slot===slot)this.equipment[slot]={itemId,instanceId:typeof stored==='object'?stored.instanceId??`legacy-${slot}-${itemId}`:`legacy-${slot}-${itemId}`};}this.player.equipment=this.equipment;this.applyAll();}
+  applyAll(){for(const slot of EQUIPMENT_SLOTS){const equipped=this.equipment[slot];if(equipped)this.player.stats.setModifier(`equipment:${slot}`,ITEM_DATABASE[equipped.itemId].stats??{});else this.player.stats.removeModifier(`equipment:${slot}`);}}
+  equipped(slot){return this.equipment[slot]??null;}
+  all(){return EQUIPMENT_SLOTS.map((slot)=>({slot,equipment:this.equipped(slot),item:this.equipment[slot]?ITEM_DATABASE[this.equipment[slot].itemId]:null}));}
+  equip(instanceOrItemId){const found=this.inventory.find(instanceOrItemId)??this.inventory.findFirst(instanceOrItemId);if(!found||found.item.type!=='equipment'||!EQUIPMENT_SLOTS.includes(found.item.slot))return this.fail('장착할 수 없는 아이템입니다.');if(this.player.stats.level<found.item.levelRequirement)return this.fail(`레벨 ${found.item.levelRequirement}부터 장착할 수 있습니다.`);const slot=found.item.slot,previous=this.equipment[slot];const removed=this.inventory.removeInstance(found.entry.instanceId,found.entry.quantity,{silent:true});if(!removed)return this.fail('장비 인스턴스를 찾지 못했습니다.');if(previous&&!this.inventory.add(previous.itemId,1,{silent:true})){this.inventory.add(removed.itemId,removed.quantity,{silent:true});return this.fail('가방 공간이 부족합니다.');}this.equipment[slot]={itemId:found.item.id,instanceId:removed.instanceId};this.player.equipment=this.equipment;this.player.stats.setModifier(`equipment:${slot}`,found.item.stats??{});this.events.emit(EVENT.EQUIPMENT_CHANGED,{slot,current:this.equipment[slot],previous});this.events.emit(EVENT.INVENTORY_CHANGED,{inventory:this.inventory});return true;}
+  unequip(slot){if(!EQUIPMENT_SLOTS.includes(slot)||!this.equipment[slot])return false;const previous=this.equipment[slot];if(!this.inventory.add(previous.itemId,1,{silent:true}))return this.fail('가방 공간이 부족합니다.');delete this.equipment[slot];this.player.stats.removeModifier(`equipment:${slot}`);this.events.emit(EVENT.EQUIPMENT_CHANGED,{slot,current:null,previous});this.events.emit(EVENT.INVENTORY_CHANGED,{inventory:this.inventory});return true;}
+  fail(message){this.events.emit(EVENT.NOTIFY,{message,type:'warning'});return false;}
+  snapshot(){return Object.fromEntries(EQUIPMENT_SLOTS.filter((slot)=>this.equipment[slot]).map((slot)=>[slot,{...this.equipment[slot]}]));}
 }

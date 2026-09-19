@@ -14,7 +14,7 @@ export class PlayerController {
   dispose() { window.removeEventListener('keydown',this._onKeyDown); window.removeEventListener('keyup',this._onKeyUp); window.removeEventListener('mousedown',this._onMouseDown); }
   onKeyDown(event) {
     if (['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)) return;
-    if ([INPUT.INVENTORY,INPUT.QUESTS,INPUT.CHARACTER,INPUT.MENU,INPUT.DEBUG].includes(event.code)) return;
+    if ([INPUT.INVENTORY,INPUT.QUESTS,INPUT.CHARACTER,INPUT.MAP,INPUT.MENU,INPUT.DEBUG].includes(event.code)) return;
     this.keys.add(event.code);
     if (event.repeat) return;
     if (event.code===INPUT.INTERACT && this.gameState.is(GAME_STATE.PLAYING)) this.interaction.interact();

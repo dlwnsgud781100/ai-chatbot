@@ -51,6 +51,11 @@
       <div class="target-bar"><i id="target-health-fill"></i></div>
     </section>
 
+    <section class="minimap hud-panel" aria-label="월드 미니맵">
+      <canvas id="minimap-canvas" width="168" height="168"></canvas>
+      <div class="minimap-footer"><span id="minimap-zone-level">LV. 1–2</span><button id="minimap-map-button" type="button">M 지도</button></div>
+    </section>
+
     <section id="interaction-prompt" class="interaction-prompt hidden">
       <kbd>E</kbd><span id="interaction-text">상호작용</span>
     </section>
@@ -62,6 +67,7 @@
       <button data-panel="inventory" type="button"><span class="keycap">I</span><span>가방</span></button>
       <button data-panel="quests" type="button"><span class="keycap">J</span><span>의뢰</span></button>
       <button data-panel="character" type="button"><span class="keycap">C</span><span>성장</span></button>
+      <button data-panel="map" type="button"><span class="keycap">M</span><span>월드맵</span></button>
       <button id="debug-button" type="button"><span class="keycap">F3</span><span>상태</span></button>
     </nav>
 
@@ -108,7 +114,7 @@
 
     <aside id="debug-panel" class="debug-panel hidden" aria-live="polite">
       <div><strong>DEVELOPER TELEMETRY</strong><button id="debug-close" type="button">×</button></div>
-      <dl><dt>FPS</dt><dd id="debug-fps">--</dd><dt>Entities</dt><dd id="debug-entities">--</dd><dt>Authority</dt><dd id="debug-network">LOCAL PREDICTION</dd><dt>Position</dt><dd id="debug-position">--</dd><dt>Build</dt><dd>foundation-0.1.0</dd></dl>
+      <dl><dt>FPS</dt><dd id="debug-fps">--</dd><dt>Entities</dt><dd id="debug-entities">--</dd><dt>Chunks</dt><dd id="debug-chunks">--</dd><dt>Authority</dt><dd id="debug-network">LOCAL PREDICTION</dd><dt>Position</dt><dd id="debug-position">--</dd><dt>Build</dt><dd>world-0.2.0</dd></dl>
     </aside>
 
     <div id="loading-screen" class="loading-screen"><div class="loader-mark">✦</div><strong>경계 너머를 준비하고 있습니다</strong><span>WORLD BOOTSTRAP · 0%</span><i><b></b></i></div>

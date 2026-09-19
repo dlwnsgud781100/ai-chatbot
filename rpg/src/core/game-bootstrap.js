@@ -19,6 +19,7 @@ import { SaveManager } from '../save/save-manager.js';
 import { RemoteClient } from '../network/remote-client.js';
 import { HUD } from '../ui/hud.js';
 import { NotificationUI } from '../ui/notification-ui.js';
+import { NavigationUI } from '../ui/navigation-ui.js';
 import { MenuController } from '../ui/menu-controller.js';
 import { DebugPanel } from '../admin/debug-panel.js';
 import { PerformanceMonitor } from '../admin/performance-monitor.js';
@@ -30,18 +31,19 @@ export class GameBootstrap {
     progress(8,'CORE SERVICES');const events=this.services.register('events',new EventBus());const logger=this.services.register('logger',new Logger(events,CONFIG.debug));const state=this.services.register('state',new GameState(events));const save=this.services.register('save',new SaveManager(logger));const saved=save.load();
     progress(22,'RENDERER');const renderer=this.services.register('renderer',new SceneRenderer(document.querySelector('#game-canvas')));
     progress(38,'PLAYER DATA');const player=this.services.register('player',new PlayerData(saved?.player));const inventory=this.services.register('inventory',new InventoryManager(events,saved?.inventory));const quests=this.services.register('quests',new QuestManager(events,inventory,player,saved?.quests));
-    progress(54,'WORLD MANAGER');const world=this.services.register('world',new WorldManager(events,renderer,quests));await world.initialize();renderer.player.position.set(player.position.x,world.getGroundHeight(player.position.x,player.position.z),player.position.z);renderer.setPlayerFacing(player.rotation);
+    progress(54,'WORLD MANAGER');const world=this.services.register('world',new WorldManager(events,renderer,quests,inventory,saved?.world));await world.initialize();renderer.player.position.set(player.position.x,world.getGroundHeight(player.position.x,player.position.z),player.position.z);renderer.setPlayerFacing(player.rotation);world.activate(renderer.player.position);
     progress(68,'COMBAT SERVICES');const loot=this.services.register('loot',new LootSystem(inventory,events));const combat=this.services.register('combat',new CombatService({events,player,world,renderer,inventory,quests,loot,gameState:state}));const interaction=this.services.register('interaction',new CharacterInteraction(events,world,state));const animator=this.services.register('animator',new CharacterAnimator(renderer));const controller=this.services.register('controller',new PlayerController({events,player,renderer,world,combat,interaction,animator,gameState:state}));combat.setController(controller);new EquipmentManager(player,inventory,events);controller.bind();
-    progress(82,'INTERFACE');const remote=this.services.register('remote',new RemoteClient(events,logger));const hud=this.services.register('hud',new HUD({events,player,inventory,quests,renderer}));new NotificationUI(events);const persist=()=>save.save({player,inventory,quests});const menu=this.services.register('menu',new MenuController({events,gameState:state,inventory,quests,player,save:persist}));const performance=this.services.register('performance',new PerformanceMonitor());const debug=this.services.register('debug',new DebugPanel({renderer,world,remote,performance}));
+    progress(82,'INTERFACE');const remote=this.services.register('remote',new RemoteClient(events,logger));const hud=this.services.register('hud',new HUD({events,player,inventory,quests,renderer}));events.emit('world:zone-changed',{zone:world.zones.current});new NotificationUI(events);const persist=()=>save.save({player,inventory,quests,world});const navigation=this.services.register('navigation',new NavigationUI({events,world,player}));const menu=this.services.register('menu',new MenuController({events,gameState:state,inventory,quests,player,world,save:persist}));const performance=this.services.register('performance',new PerformanceMonitor());const debug=this.services.register('debug',new DebugPanel({renderer,world,remote,performance}));
     this.bindUI({events,state,renderer,player,inventory,quests,world,combat,controller,remote,menu,persist});
     progress(94,'AUTHORITY HANDSHAKE');remote.connect();
-    await new Promise(resolve=>setTimeout(resolve,260));progress(100,'FIELD READY');await new Promise(resolve=>setTimeout(resolve,180));loading.style.opacity='0';setTimeout(()=>loading.remove(),500);state.set(GAME_STATE.TITLE,'boot-complete');this.loop(performance,debug,controller,combat,renderer,persist);return this;
+    await new Promise(resolve=>setTimeout(resolve,260));progress(100,'FIELD READY');await new Promise(resolve=>setTimeout(resolve,180));loading.style.opacity='0';setTimeout(()=>loading.remove(),500);state.set(GAME_STATE.TITLE,'boot-complete');this.loop(performance,debug,navigation,controller,combat,renderer,persist);return this;
   }
   bindUI({events,state,renderer,player,inventory,quests,world,combat,controller,remote,menu,persist}) {
     document.querySelector('#start-button').onclick=()=>this.start(state);
     document.querySelector('#respawn-button').onclick=()=>this.respawn({state,renderer,player,world,events,persist});
     document.querySelectorAll('[data-skill]').forEach(button=>button.addEventListener('click',()=>combat.useSkill(button.dataset.skill)));
     document.querySelector('#mobile-interact').onclick=()=>controller.interaction.interact();
+    events.on('navigation:open-map',()=>menu.open('map'));
     events.on('network:intent',(intent)=>remote.submit(intent));
     events.on(EVENT.QUEST_CHANGED,({quest,completed,levels})=>{if(completed){events.emit(EVENT.NOTIFY,{message:`의뢰 완료: ${quest.title}`,type:'success'});if(levels?.length)events.emit(EVENT.NOTIFY,{message:`Lv.${levels.at(-1)}로 성장했습니다.`,type:'success'});}});
     events.on('player:death',()=>{if(!state.is(GAME_STATE.DEAD)){state.set(GAME_STATE.DEAD,'health-depleted');document.querySelector('#death-screen').classList.remove('hidden');}});
@@ -50,7 +52,7 @@ export class GameBootstrap {
       if(event.code==='F3'){event.preventDefault();this.services.get('debug').toggle();return;}
       if(event.code==='Escape'){if(state.is(GAME_STATE.MODAL))menu.close();return;}
       if(state.is(GAME_STATE.DIALOGUE)&&Date.now()>this.dialogueReadyAt&&(event.code==='KeyE'||event.code==='Space')){event.preventDefault();this.closeDialogue(state);return;}
-      if(state.is(GAME_STATE.PLAYING)){if(event.code==='KeyI')menu.open('inventory');if(event.code==='KeyJ')menu.open('quests');if(event.code==='KeyC')menu.open('character');}
+      if(state.is(GAME_STATE.PLAYING)){if(event.code==='KeyI')menu.open('inventory');if(event.code==='KeyJ')menu.open('quests');if(event.code==='KeyC')menu.open('character');if(event.code==='KeyM')menu.open('map');}
     });
     // Save only on meaningful state changes and on a conservative timed cadence in the loop.
     for(const event of [EVENT.INVENTORY_CHANGED,EVENT.QUEST_CHANGED])events.on(event,()=>persist());
@@ -61,5 +63,5 @@ export class GameBootstrap {
   openDialogue(dialogue,state){this.dialogue=dialogue;document.querySelector('#dialogue-speaker').textContent=dialogue.speaker;document.querySelector('#dialogue-text').textContent=dialogue.text;document.querySelector('#dialogue-box').classList.remove('hidden');state.set(GAME_STATE.DIALOGUE,'interaction');this.dialogueReadyAt=Date.now()+160;}
   closeDialogue(state){document.querySelector('#dialogue-box').classList.add('hidden');const callback=this.dialogue?.onComplete;this.dialogue=null;state.set(GAME_STATE.PLAYING,'dialogue-close');callback?.();}
   respawn({state,renderer,player,world,events,persist}){player.stats.health=Math.ceil(player.stats.maxHealth*.7);player.stats.energy=player.stats.maxEnergy;renderer.player.position.set(WORLD.RESPAWN.x,world.getGroundHeight(WORLD.RESPAWN.x,WORLD.RESPAWN.z),WORLD.RESPAWN.z);player.position.x=WORLD.RESPAWN.x;player.position.z=WORLD.RESPAWN.z;document.querySelector('#death-screen').classList.add('hidden');state.set(GAME_STATE.PLAYING,'respawn');events.emit(EVENT.NOTIFY,{message:'길잡이 불씨 곁에서 되살아났습니다.',type:'success'});persist();}
-  loop(performance,debug,controller,combat,renderer,persist){const frame=(time)=>{const delta=Math.min(CONFIG.performance.maxDelta,(time-this.lastFrame||16.7)/1000);this.lastFrame=time;const state=this.services.get('state');if(state.is(GAME_STATE.PLAYING)){controller.update(delta,time);combat.update(delta,time/1000);if(time-this.lastSave>12000){persist();this.lastSave=time;}}performance.update(delta);debug.update();renderer.update(delta);requestAnimationFrame(frame);};requestAnimationFrame(frame);}
+  loop(performance,debug,navigation,controller,combat,renderer,persist){const frame=(time)=>{const delta=Math.min(CONFIG.performance.maxDelta,(time-this.lastFrame||16.7)/1000);this.lastFrame=time;const state=this.services.get('state');if(state.is(GAME_STATE.PLAYING)){controller.update(delta,time);combat.update(delta,time/1000);if(time-this.lastSave>12000){persist();this.lastSave=time;}}performance.update(delta);navigation.update();debug.update();renderer.update(delta);requestAnimationFrame(frame);};requestAnimationFrame(frame);}
 }

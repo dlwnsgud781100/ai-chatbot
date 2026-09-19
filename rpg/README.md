@@ -18,12 +18,14 @@ The command exposes both the static client and a small demo intent gateway at `/
 | Action | Keyboard / mouse |
 | --- | --- |
 | Move | `WASD` / arrow keys |
-| Sprint | `Left Shift` |
-| Jump | `Space` |
-| Attack | left mouse button / `1` |
-| Rift Lance | `2` |
-| Dew vial | `3` |
-| Dodge | `Q` |
+| Sprint / dash | hold / tap `Left Shift` |
+| Jump / air attack | `Space` / `Space + 1` |
+| Light combo | left mouse button / `1` |
+| Heavy attack / Rift Lance | `2` / `3` |
+| Dew vial | `4` |
+| Dodge / guard-parry | `Q` / `F` |
+| Target lock / cycle | `R` / `T` |
+| Ultimate | `V` at 100% Resolve |
 | Interact / dialogue | `E` |
 | Inventory / quests / character | `I` / `J` / `C` |
 | World map / fast travel | `M` |
@@ -37,7 +39,7 @@ src/
   core/        bootstrap, state machine, event bus, service container, config
   data/        declarative zones, NPCs, enemies, quests, skills, items
   player/      controller, data, stats, semantic animation, interaction
-  combat/      targeting, skills, damage, status-effect seam, combat service
+  combat/      action timeline, hit detection, targeting, AI, damage, feedback, status effects
   world/       zone packages, chunk streaming, navigation, spawning, NPC, resources, environment
   quest/       objective progress and reward progression
   inventory/   inventory, equipment seam, and loot rolls
@@ -63,7 +65,8 @@ The single-player demo stores a versioned save in `localStorage` under `ashenwil
 - A data-driven 10-zone open-world topology centred on the Worldroot Plaza and its World Tree hub.
 - Streamed 48×48 chunks, terrain/material variants, environmental profiles, local resources, NPCs, enemies, boss markers, landmarks, dungeon gates, POIs, and waypoint data.
 - Mini map, zone discovery, world map, waypoint activation, and discovered-waypoint fast travel. See [WORLD.md](./WORLD.md) for the zone manifest and lifecycle.
-- Walking, sprint energy, jumping, dodge, targeting, basic attack, ranged skill, potion consumption, enemy pursuit/attacks, death, and respawn.
+- A real-time action combat slice: three-step light combo, heavy attack, lightning skill, dodge, dash, guard/perfect parry, target lock/cycling, air attack, Resolve ultimate, knockback, stun, stagger, damage types, status effects, hit-stop, camera shake, VFX, and synthesized impact cues.
+- Three nearby normal archetypes, Root Warden elite, and the staged Thornheart Guardian boss. See [COMBAT.md](./COMBAT.md) for controls and encounter behavior.
 - XP/levels, item drops, inventory, quest objectives/rewards, dialogue interaction, versioned local saving, HUD, responsive touch affordances, debug panel, and gateway health/action calls.
 
-This remains a deliberately bounded vertical slice. Dungeon instance generation, boss phases, full equipment slots, authoritative multiplayer simulation, mobile gesture movement, audio playback, accessibility settings, and production asset streaming are planned extensions rather than placeholder systems disguised as complete features.
+This remains a deliberately bounded vertical slice. Dungeon instance generation, full equipment slots, authoritative multiplayer simulation, mobile gesture movement, streamed production audio, accessibility settings, and production asset streaming are planned extensions rather than placeholder systems disguised as complete features.

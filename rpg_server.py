@@ -23,7 +23,8 @@ ROOT = Path(__file__).resolve().parent / "rpg"
 MAX_BODY_BYTES = 8_192
 MAX_WORLD_COORDINATE = 1_000
 VALID_INTENTS = {"move", "combat", "interact", "respawn"}
-SKILL_RE = re.compile(r"^[a-z_]{1,40}$")
+VALID_COMBAT_ACTIONS = {"light_1", "light_2", "light_3", "heavy", "rift", "air", "ultimate"}
+COMBAT_COOLDOWNS = {"light_1": 0.08, "light_2": 0.08, "light_3": 0.08, "heavy": 1.15, "rift": 4.4, "air": 0.8, "ultimate": 16.0}
 TARGET_RE = re.compile(r"^[a-z0-9_-]{1,96}$")
 SESSIONS: dict[str, dict[str, Any]] = {}
 
@@ -71,7 +72,7 @@ class GameRequestHandler(SimpleHTTPRequestHandler):
         session_id = payload.get("sessionId") or f"guest-{uuid.uuid4()}"
         # In production, obtain session identity from an authenticated credential;
         # never trust a client-supplied identity as this demo does.
-        state = SESSIONS.setdefault(session_id, {"lastAction": 0.0, "position": {"x": -10, "z": 9}})
+        state = SESSIONS.setdefault(session_id, {"lastAction": 0.0, "lastCombat": 0.0, "cooldowns": {}, "position": {"x": -10, "z": 9}})
         now = time.monotonic()
         if now - state["lastAction"] < 0.03:
             self.send_json(HTTPStatus.TOO_MANY_REQUESTS, {"approved": False, "reason": "Intent rate limited"})
@@ -80,6 +81,18 @@ class GameRequestHandler(SimpleHTTPRequestHandler):
         intent = payload["intent"]
         if intent["type"] == "move":
             state["position"] = {"x": intent["position"]["x"], "z": intent["position"]["z"]}
+        if intent["type"] == "combat":
+            action = intent["action"]
+            if now - state["lastCombat"] < 0.05:
+                self.send_json(HTTPStatus.TOO_MANY_REQUESTS, {"approved": False, "reason": "Combat rate limited"})
+                return
+            ready_at = state["cooldowns"].get(action, 0.0)
+            if now < ready_at:
+                self.send_json(HTTPStatus.CONFLICT, {"approved": False, "reason": "Server cooldown active"})
+                return
+            state["lastCombat"] = now
+            state["cooldowns"][action] = now + COMBAT_COOLDOWNS[action]
+        # Damage, XP, currency and drop values are deliberately absent from the wire format.
         self.send_json(HTTPStatus.OK, {"approved": True, "receipt": str(uuid.uuid4()), "serverTime": time.time()})
 
     def send_json(self, status: HTTPStatus, body: dict[str, Any]) -> None:
@@ -101,6 +114,9 @@ def validate_payload(payload: Any) -> tuple[bool, str]:
     intent_type = intent.get("type")
     if intent_type not in VALID_INTENTS:
         return False, "Unsupported intent"
+    allowed_fields = {"move": {"type", "position"}, "combat": {"type", "action", "targetId"}, "interact": {"type", "targetId"}, "respawn": {"type"}}
+    if set(intent) - allowed_fields[intent_type]:
+        return False, "Unexpected client-controlled state"
     if intent_type == "move":
         position = intent.get("position")
         if not isinstance(position, dict) or not all(isinstance(position.get(axis), (int, float)) for axis in ("x", "z")):
@@ -108,7 +124,7 @@ def validate_payload(payload: Any) -> tuple[bool, str]:
         if any(abs(position[axis]) > MAX_WORLD_COORDINATE for axis in ("x", "z")):
             return False, "Movement outside permitted range"
     if intent_type == "combat":
-        if not SKILL_RE.fullmatch(intent.get("skill", "")) or not TARGET_RE.fullmatch(intent.get("targetId", "")):
+        if intent.get("action") not in VALID_COMBAT_ACTIONS or not TARGET_RE.fullmatch(intent.get("targetId", "")):
             return False, "Invalid combat intent"
     return True, ""
 

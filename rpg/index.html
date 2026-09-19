@@ -47,8 +47,14 @@
     </aside>
 
     <section id="target-frame" class="target-frame hidden" aria-label="현재 대상">
-      <div class="target-head"><span class="target-mark">◇</span><strong id="target-name">가시걸음</strong><small id="target-level">Lv. 1</small></div>
+      <div class="target-head"><span id="target-lock-state" class="target-mark">◇</span><strong id="target-name">가시걸음</strong><small id="target-level">Lv. 1</small></div>
       <div class="target-bar"><i id="target-health-fill"></i></div>
+      <div id="target-statuses" class="target-statuses"></div>
+    </section>
+
+    <section id="boss-frame" class="boss-frame hidden" aria-label="보스 상태">
+      <div><span id="boss-phase">PHASE I · 각성</span><strong id="boss-name">심근의 수호자</strong><small id="boss-status">위협 분석 중</small></div>
+      <div class="boss-bar"><i id="boss-health-fill"></i></div>
     </section>
 
     <section class="minimap hud-panel" aria-label="월드 미니맵">
@@ -72,16 +78,18 @@
     </nav>
 
     <section class="skill-dock" aria-label="전투 기술">
-      <button class="skill-slot primary" data-skill="basic" type="button" aria-label="기본 공격, 1 또는 마우스 왼쪽"><span class="slot-key">1</span><span class="skill-icon">⚔</span><span class="skill-name">절단</span><i class="cooldown"></i></button>
-      <button class="skill-slot" data-skill="arcane" type="button" aria-label="균열창, 2"><span class="slot-key">2</span><span class="skill-icon">✧</span><span class="skill-name">균열창</span><i class="cooldown"></i></button>
-      <button class="skill-slot" data-skill="potion" type="button" aria-label="이슬 약병, 3"><span class="slot-key">3</span><span class="skill-icon">♧</span><span class="skill-name">이슬 약병</span><i class="cooldown"></i><b id="potion-count">2</b></button>
+      <button class="skill-slot primary" data-skill="light" type="button" aria-label="경공격, 1 또는 마우스 왼쪽"><span class="slot-key">1</span><span class="skill-icon">⚔</span><span class="skill-name">연격</span><i class="cooldown"></i></button>
+      <button class="skill-slot" data-skill="heavy" type="button" aria-label="강공격, 2"><span class="slot-key">2</span><span class="skill-icon">✹</span><span class="skill-name">강타</span><i class="cooldown"></i></button>
+      <button class="skill-slot" data-skill="rift" type="button" aria-label="번개 균열창, 3"><span class="slot-key">3</span><span class="skill-icon">✧</span><span class="skill-name">균열창</span><i class="cooldown"></i></button>
+      <button class="skill-slot" data-skill="potion" type="button" aria-label="이슬 약병, 4"><span class="slot-key">4</span><span class="skill-icon">♧</span><span class="skill-name">약병</span><i class="cooldown"></i><b id="potion-count">2</b></button>
       <button class="skill-slot" data-skill="dodge" type="button" aria-label="회피, Q"><span class="slot-key">Q</span><span class="skill-icon">➜</span><span class="skill-name">회피</span><i class="cooldown"></i></button>
-      <div class="combat-hint"><span><b>WASD</b> 이동</span><span><b>Shift</b> 질주</span><span><b>Space</b> 점프</span></div>
+      <button class="skill-slot ultimate" data-skill="ultimate" type="button" aria-label="여명의 단죄, V"><span class="slot-key">V</span><span class="skill-icon">☼</span><span class="skill-name">궁극기</span><i class="cooldown"></i><b id="ultimate-percent">100</b></button>
+      <div class="combat-hint"><span><b>WASD</b> 이동 · <b>Shift</b> 돌진</span><span><b>F</b> 방어/패링 · <b>R</b> 고정</span><span><b>Space + 1</b> 공중 참격</span></div>
     </section>
 
     <div class="mobile-controls" aria-label="터치 컨트롤">
       <div class="mobile-stick"><span></span></div>
-      <div class="mobile-buttons"><button data-skill="basic">⚔</button><button data-skill="dodge">↝</button><button id="mobile-interact">E</button></div>
+      <div class="mobile-buttons"><button data-skill="light">⚔</button><button data-skill="dodge">↝</button><button id="mobile-interact">E</button></div>
     </div>
 
     <div id="modal-backdrop" class="modal-backdrop hidden">
@@ -107,14 +115,14 @@
         <button id="start-button" class="start-button" type="button"><span>PLAY FIELD DEMO</span><b>↗</b></button>
         <div class="start-footnote"><span>세 번째 시점 액션</span><i></i><span>오프라인 데모 · 저장 지원</span></div>
       </div>
-      <div class="title-controls"><b>WASD</b> 이동 <b>Shift</b> 질주 <b>LMB / 1</b> 공격 <b>E</b> 상호작용</div>
+      <div class="title-controls"><b>WASD</b> 이동 <b>LMB / 1</b> 연격 <b>F</b> 패링 <b>R</b> 타겟 고정 <b>V</b> 궁극기</div>
     </section>
 
     <div id="death-screen" class="death-screen hidden"><div><span>THE FRONTIER HOLDS ITS BREATH</span><h2>쓰러졌습니다</h2><p>야영지의 불빛이 당신을 다시 부릅니다.</p><button id="respawn-button" type="button">야영지에서 부활</button></div></div>
 
     <aside id="debug-panel" class="debug-panel hidden" aria-live="polite">
       <div><strong>DEVELOPER TELEMETRY</strong><button id="debug-close" type="button">×</button></div>
-      <dl><dt>FPS</dt><dd id="debug-fps">--</dd><dt>Entities</dt><dd id="debug-entities">--</dd><dt>Chunks</dt><dd id="debug-chunks">--</dd><dt>Authority</dt><dd id="debug-network">LOCAL PREDICTION</dd><dt>Position</dt><dd id="debug-position">--</dd><dt>Build</dt><dd>world-0.2.0</dd></dl>
+      <dl><dt>FPS</dt><dd id="debug-fps">--</dd><dt>Entities</dt><dd id="debug-entities">--</dd><dt>Chunks</dt><dd id="debug-chunks">--</dd><dt>Authority</dt><dd id="debug-network">LOCAL PREDICTION</dd><dt>Position</dt><dd id="debug-position">--</dd><dt>Build</dt><dd>combat-0.3.0</dd></dl>
     </aside>
 
     <div id="loading-screen" class="loading-screen"><div class="loader-mark">✦</div><strong>경계 너머를 준비하고 있습니다</strong><span>WORLD BOOTSTRAP · 0%</span><i><b></b></i></div>

@@ -23,6 +23,10 @@ The runnable game lives in its own `rpg/` client directory and is served by the 
 
 Phase 2 keeps the existing composition root and adds zone data in `rpg/src/data/world-zones.js`. `WorldManager` now composes `ChunkStreamingManager`, `WorldNavigation`, `ResourceManager`, streamed NPCs/spawns, and an environment adapter. A 3×3 active chunk ring drives rendering and simulation activation; terrain chunks cache only a bounded number of inactive render groups. The World Tree is a permanent hub landmark, while adjacent world content remains streamable. Details are documented in `rpg/WORLD.md`.
 
+## Phase 3 extension: real-time combat
+
+Phase 3 preserves the existing `CombatService` boundary and extends it with declarative action data, hit detection, elemental damage calculation, status effects, target locking, generated audio feedback, and a stream-safe enemy AI state machine. `SpawnManager` owns `EnemyAiSystem` instances rather than embedding AI branches in the World Manager. Boss phases and enemy pattern data remain in `data/combat-data.js`; renderer feedback is still isolated in `SceneRenderer`. The action intent contract sends only action/target IDs to the demo server — it never trusts client damage or rewards. Details are documented in `rpg/COMBAT.md`.
+
 ## Extension sequence
 
 1. Move declarative content from the current module into schema-validated JSON bundles and build authoring/import tests.

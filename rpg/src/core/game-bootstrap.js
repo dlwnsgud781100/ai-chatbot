@@ -41,10 +41,11 @@ export class GameBootstrap {
   bindUI({events,state,renderer,player,inventory,quests,world,combat,controller,remote,menu,persist}) {
     document.querySelector('#start-button').onclick=()=>this.start(state);
     document.querySelector('#respawn-button').onclick=()=>this.respawn({state,renderer,player,world,events,persist});
-    document.querySelectorAll('[data-skill]').forEach(button=>button.addEventListener('click',()=>combat.useSkill(button.dataset.skill)));
+    document.querySelectorAll('[data-skill]').forEach(button=>button.addEventListener('click',()=>combat.useAction(button.dataset.skill)));
     document.querySelector('#mobile-interact').onclick=()=>controller.interaction.interact();
     events.on('navigation:open-map',()=>menu.open('map'));
     events.on('network:intent',(intent)=>remote.submit(intent));
+    events.on('network:rejected',(result)=>events.emit(EVENT.NOTIFY,{message:`서버 검증 거부: ${result.reason??'알 수 없는 요청'}`,type:'warning'}));
     events.on(EVENT.QUEST_CHANGED,({quest,completed,levels})=>{if(completed){events.emit(EVENT.NOTIFY,{message:`의뢰 완료: ${quest.title}`,type:'success'});if(levels?.length)events.emit(EVENT.NOTIFY,{message:`Lv.${levels.at(-1)}로 성장했습니다.`,type:'success'});}});
     events.on('player:death',()=>{if(!state.is(GAME_STATE.DEAD)){state.set(GAME_STATE.DEAD,'health-depleted');document.querySelector('#death-screen').classList.remove('hidden');}});
     events.on('ui:dialogue',(dialogue)=>this.openDialogue(dialogue,state));

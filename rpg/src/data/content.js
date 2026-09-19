@@ -1,5 +1,6 @@
 // Combat and progression data. Geographic content is in world-zones.js so new zone
 // packages can be authored without touching gameplay systems.
+import { PLAYER_ACTIONS } from './combat-data.js';
 export { ZONES, CHUNK_SIZE, WORLD_BOUNDS } from './world-zones.js';
 
 export const ENEMIES = Object.freeze({
@@ -16,6 +17,7 @@ export const ENEMIES = Object.freeze({
   crest_giant:{ id:'crest_giant', name:'절벽 거인', level:10, maxHealth:220, attack:31, defense:8, speed:1.7, aggroRange:14, attackRange:2.8, attackCooldown:1.6, xp:130, loot:[{itemId:'crown_ore',chance:.75,min:1,max:2}], color:0x8e9994, emissive:0x3c5351 },
   crest_warden:{ id:'crest_warden', name:'하늘다리 수호자', level:12, maxHealth:570, attack:45, defense:13, speed:1.45, aggroRange:17, attackRange:3.1, attackCooldown:1.9, xp:520, loot:[{itemId:'crown_ore',chance:1,min:4,max:5}], color:0xb0bbb5, emissive:0x526d70, elite:true },
   void_sentinel:{ id:'void_sentinel', name:'공허 감시자', level:14, maxHealth:350, attack:48, defense:14, speed:2.1, aggroRange:16, attackRange:2.8, attackCooldown:1.45, xp:220, loot:[{itemId:'star_fragment',chance:.64,min:1,max:2}], color:0x807ac2, emissive:0x302761, elite:true },
+  thornheart_titan:{ id:'thornheart_titan', name:'심근의 수호자 · 아우렐', level:8, maxHealth:980, attack:32, defense:9, speed:2.05, aggroRange:19, attackRange:4.2, attackCooldown:1.2, xp:750, loot:[{itemId:'warden_core',chance:1,min:1,max:1},{itemId:'rootlight_seed',chance:1,min:3,max:4}], color:0x8aae59, emissive:0x294f1e, boss:true, elite:true, bossProfile:'thornheart_titan' },
 });
 
 export const ITEMS = Object.freeze({
@@ -40,12 +42,8 @@ export const ITEMS = Object.freeze({
   windflower:{ id:'windflower', name:'절벽꽃', icon:'✿', type:'material', description:'강풍 속에서 자라는 단단한 꽃.', rarity:'uncommon' },
 });
 
-export const SKILLS = Object.freeze({
-  basic:{ id:'basic', name:'절단', cooldown:.58, energy:0, range:3.15, damage:18, type:'physical', intent:'attack' },
-  arcane:{ id:'arcane', name:'균열창', cooldown:5.5, energy:24, range:9.5, damage:37, type:'arcane', intent:'skill' },
-  dodge:{ id:'dodge', name:'회피', cooldown:1.5, energy:18, type:'movement', intent:'dodge' },
-  potion:{ id:'potion', name:'이슬 약병', cooldown:1, energy:0, type:'consumable', intent:'item' },
-});
+// Legacy UI consumers receive the same declarative action definitions.
+export const SKILLS = PLAYER_ACTIONS;
 
 export const QUESTS = Object.freeze({
   breach_line:{ id:'breach_line', title:'균열의 경계선', category:'메인', description:'초원의 가시걸음을 처치해 균열의 확산을 늦추십시오.', objectives:[{id:'thornwalker_hunt',type:'kill',targetId:'thornwalker',required:3,label:'가시걸음 처치'}], rewards:{xp:85,items:[{itemId:'dew_vial',quantity:1}]}, next:'watcher_signal' },

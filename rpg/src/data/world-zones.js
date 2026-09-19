@@ -15,7 +15,9 @@ export const ZONES = Object.freeze({
     waypoints:[point('worldroot_waypoint','waypoint','세계수 광장',-10,9,{discovered:true})],
     pois:[point('guild_board','quest','개척단 의뢰 게시판',-5,4,{kind:'board'}),point('craft_pavilion','service','뿌리결 제작소',11,6,{kind:'craft'}),point('skywell_gate','dungeon','봉인된 하늘우물',20,-16,{kind:'gate',locked:true})],
     resources:[resource('rootlight_01','rootlight_seed','뿌리빛 씨앗',-21,-5),resource('rootlight_02','rootlight_seed','뿌리빛 씨앗',15,17)],
-    spawns:[spawn('hub_moth_01','cinder_moth',34,-30),spawn('hub_moth_02','cinder_moth',39,-12)],
+    // A compact combat proving ground sits beyond the plaza: three normal archetypes,
+    // one elite and a staged boss are always reachable from the initial hub.
+    spawns:[spawn('hub_thorn_01','thornwalker',22,18),spawn('hub_moth_01','cinder_moth',31,9),spawn('hub_wisp_01','frost_wisp',18,-24),spawn('hub_elite_warden','rootwarden',31,-24,{elite:true}),spawn('hub_boss_aurel','thornheart_titan',34,31,{boss:true})],
   }),
   whispering_verge: zone({
     id:'whispering_verge', name:'잔향의 초원', subtitle:'Whispering Verge · 초심자 변경', levelRange:'Lv. 1–3', bounds:{minX:-144,maxX:-48,minZ:-48,maxZ:48}, biome:'meadow', weather:'mist', ambient:'meadow_insects', bgm:'verge_winds',

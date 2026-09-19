@@ -1,11 +1,19 @@
 import { GameBootstrap } from './core/game-bootstrap.js';
 
-const bootstrap=new GameBootstrap();
-bootstrap.initialize().catch((error)=>{
+const showFatal=(error)=>{
   console.error('Ashenwild bootstrap failed',error);
-  const loader=document.querySelector('#loading-screen');
-  if(loader)loader.innerHTML='<div class="loader-mark">!</div><strong>월드 초기화에 실패했습니다</strong><span>브라우저 콘솔에서 상세 오류를 확인해 주세요.</span>';
-});
+  document.querySelector('#loading-screen')?.remove();
+  let root=document.querySelector('#fatal-fallback');
+  if(!root){root=document.createElement('section');root.id='fatal-fallback';root.className='fatal-fallback';root.dataset.testid='renderer-fallback';document.body.append(root);}
+  root.innerHTML='<div><span class="eyebrow">ASHENWILD FRONTIER</span><h1>월드를 시작할 수 없습니다</h1><p>그래픽 기능 또는 필수 데이터를 준비하지 못했습니다.<br>브라우저를 새로고침한 뒤 다시 시도해 주세요.</p><button type="button" data-retry>다시 시도</button></div>';
+  root.querySelector('[data-retry]').onclick=()=>location.reload();
+};
 
-// Intentional development seam: inspect only through an explicit query flag.
-if(new URLSearchParams(location.search).has('debug')) window.Ashenwild=bootstrap;
+try {
+  const bootstrap=new GameBootstrap();
+  bootstrap.initialize().catch(showFatal);
+  // Intentional development seam: inspect only through an explicit query flag.
+  if(new URLSearchParams(location.search).has('debug'))window.Ashenwild=bootstrap;
+} catch(error) { showFatal(error); }
+
+window.addEventListener('error',(event)=>{if(event.target?.tagName==='CANVAS'||/WebGL/i.test(event.message??''))showFatal(event.error??event.message);},{capture:true});

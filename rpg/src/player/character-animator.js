@@ -1,6 +1,12 @@
-// Renderer-neutral state holder. A production animation controller can map these semantic states to clips.
+import { EVENT } from '../core/constants.js';
+import { ANIMATION_STATES, AnimationStateMachine } from '../presentation/animation-state-machine.js';
+
+/** Semantic clip-ready controller; procedural posing remains a temporary renderer fallback, not an animation asset. */
 export class CharacterAnimator {
-  constructor(renderer) { this.renderer=renderer; this.state='idle'; }
-  set(state) { this.state=state; this.renderer.setPlayerAnimation(state); }
-  update(delta, velocity) { if (this.state==='attack'||this.state==='dodge'||this.state==='dead') return; this.set(velocity>.2?'run':'idle'); this.renderer.animatePlayer(delta,velocity); }
+  constructor(renderer,events=null){this.renderer=renderer;this.events=events;this.machine=new AnimationStateMachine();this.clipAdapter=null;this.bind();this.apply();}
+  setClipAdapter(adapter){this.clipAdapter=adapter??null;this.machine.setRootMotionAdapter(adapter?.rootMotion);this.apply();}
+  bind(){if(!this.events)return;this.events.on(EVENT.COMBAT_STATE,({state,action})=>{if(state==='attack'&&action)this.machine.action(action);else if(state==='dodge')this.machine.transition(ANIMATION_STATES.DODGE,{lock:.3,event:{phase:'utility'}});else if(state==='dash')this.machine.transition(ANIMATION_STATES.DASH,{lock:.18,event:{phase:'utility'}});else if(state==='guard')this.machine.transition(ANIMATION_STATES.GUARD);this.apply();});this.events.on(EVENT.DAMAGE,({target,guarded})=>{if(target==='player'&&!guarded)this.machine.transition(ANIMATION_STATES.HIT,{lock:.11,event:{phase:'hit'}});this.apply();});this.events.on('player:jump',()=>{this.machine.transition(ANIMATION_STATES.JUMP,{lock:.13,event:{phase:'jump'}});this.apply();});this.events.on('player:land',()=>{this.machine.transition(ANIMATION_STATES.LAND,{lock:.1,event:{phase:'land'}});this.apply();});this.events.on('combat:perfect-parry',()=>{this.machine.transition(ANIMATION_STATES.PARRY,{lock:.2,event:{phase:'parry'}});this.apply();});this.events.on('player:death',()=>{this.machine.transition(ANIMATION_STATES.DEATH,{force:true,event:{phase:'death'}});this.apply();});this.events.on(EVENT.REWARD_GRANTED,({levels})=>{if(levels?.length){this.machine.transition(ANIMATION_STATES.VICTORY,{lock:.7,event:{phase:'level'}});this.apply();}});}
+  apply(){const snapshot=this.machine.snapshot();this.renderer.setPlayerAnimation(this.machine.current);this.clipAdapter?.transition?.(snapshot);this.events?.emit('presentation:animation-state',snapshot);}
+  update(delta,velocity,{sprinting=false,airborne=false,guarding=false}={}){const changed=this.machine.update(delta,{velocity,sprinting,airborne,guarding});if(changed)this.apply();this.renderer.animatePlayer(delta,velocity,this.machine.current);}
+  snapshot(){return this.machine.snapshot();}
 }

@@ -1,10 +1,10 @@
-// Small synthesized cues avoid shipping copied audio assets while preserving action feedback.
+// Combat owns semantic cue requests; AudioService selects routed synthesized/asset playback.
 export class CombatFeedback {
-  constructor(renderer) { this.renderer=renderer;this.context=null; }
-  unlock(){if(!this.context){const Audio=window.AudioContext||window.webkitAudioContext;if(Audio)this.context=new Audio();}if(this.context?.state==='suspended')this.context.resume();}
-  tone(frequency,duration=.06,volume=.035,type='triangle'){if(!this.context)return;const oscillator=this.context.createOscillator(),gain=this.context.createGain();oscillator.type=type;oscillator.frequency.setValueAtTime(frequency,this.context.currentTime);gain.gain.setValueAtTime(volume,this.context.currentTime);gain.gain.exponentialRampToValueAtTime(.0001,this.context.currentTime+duration);oscillator.connect(gain).connect(this.context.destination);oscillator.start();oscillator.stop(this.context.currentTime+duration);}
-  playerSwing(action){this.unlock();this.tone(action.id==='heavy'?110:action.id==='ultimate'?240:180,.055,.025,'sawtooth');}
-  impact({critical=false,type='physical',heavy=false}){this.unlock();const frequency=type==='lightning'?510:type==='fire'?280:type==='ice'?640:critical?390:220;this.tone(frequency,heavy ? .11 : .055,heavy ? .06 : .035,heavy?'square':'triangle');}
-  guard(parry){this.unlock();this.tone(parry?720:300,parry ? .12 : .05,parry ? .07 : .025,'sine');}
-  enemyTelegraph(boss){this.unlock();this.tone(boss?85:130,boss ? .16 : .06,boss ? .045 : .018,'sawtooth');}
+  constructor(renderer,events=null){this.renderer=renderer;this.events=events;}
+  unlock(){this.events?.emit('audio:unlock',{});}
+  play(id,options={}){this.events?.emit('audio:play',{id,options});}
+  playerSwing(action){this.unlock();this.play(action.id==='heavy'?'player.swing.heavy':action.id==='rift'||action.id==='ultimate'?'player.skill':'player.swing.light');}
+  impact({critical=false,type='physical',heavy=false}){this.unlock();this.play(critical||heavy?'combat.hit.critical':'combat.hit',{pitch:type==='lightning'?1.5:type==='ice'?1.8:type==='fire'?1.2:1});}
+  guard(parry){this.unlock();this.play(parry?'player.parry':'combat.hit',{volume:parry?1:.35});}
+  enemyTelegraph(boss){this.unlock();this.play(boss?'combat.boss-warning':'combat.hit',{volume:boss?1:.25,pitch:boss ? .45 : .62});}
 }

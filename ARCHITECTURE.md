@@ -4,51 +4,25 @@
 
 The tracked project began as a two-file Streamlit/Groq educational chatbot (`app.py`, `requirements.txt`). It has no game runtime, 3D renderer, game data, server authority layer, or RPG domain model. That application is intentionally left unchanged so its existing behaviour is not broken.
 
-`game.zip` and `mystic_woods_free_2.1.zip` are archive assets, not imported source-tree dependencies. The new RPG does not unpack or reuse their interface, gameplay, sprites, maps, or code. This avoids silently coupling the new game to an unrelated 2D prototype or third-party pixel-art pack.
+`game.zip` and `mystic_woods_free_2.1.zip` are archive assets, not imported source-tree dependencies. The RPG does not unpack or reuse their interface, gameplay, sprites, maps, or code.
 
-## Change boundary
+## Boundary and decisions
 
-The runnable game lives in its own `rpg/` client directory and is served by the dependency-free root `rpg_server.py`. It is isolated from the existing Streamlit application. This creates a safe migration path: the chatbot can later link to a game portal, or both applications can be put behind an outer router, without entangling their dependencies.
+The runnable game lives in `rpg/` and is served by the dependency-free root `rpg_server.py`. `GameBootstrap` is the composition root. Three.js presentation remains behind `SceneRenderer`; gameplay systems communicate through narrow dependencies and typed-by-convention events.
 
-## Decisions
+Content is declarative, local saves are versioned and defensively validated, and the Python endpoint validates action intents without claiming to be an authoritative multiplayer simulation. The Phase 3/4 systems remain the source of gameplay truth for the single-player demo.
 
-- **Presentation:** Three.js, procedural primitives only, behind `SceneRenderer` so it can later be replaced with asset loading / a different renderer.
-- **Composition:** `GameBootstrap` is the only service-wiring module. Systems talk through typed-by-convention events and narrow dependencies instead of global imports.
-- **Content:** IDs and balancing data are declarative in `data/content.js`; systems are generic over content definitions.
-- **Persistence:** versioned, validated local demo saves. The save shape has an explicit validation boundary rather than trusting browser storage.
-- **Networking:** client intent submissions and a separate endpoint are present. The demo endpoint validates wire format but does not claim to be an authoritative multiplayer simulation.
-- **Scope:** one high-quality field loop was chosen over prematurely creating dozens of empty zones, menus, items, and dungeon types.
+## Phase 2: streamed world
 
-## Phase 2 extension: open-world streaming
+`WorldManager` composes zones, chunk streaming, navigation, resources, streamed NPCs/spawns, and environment state. A bounded active chunk ring and cached inactive render groups keep the original open-world foundation intentionally compact.
 
-Phase 2 keeps the existing composition root and adds zone data in `rpg/src/data/world-zones.js`. `WorldManager` now composes `ChunkStreamingManager`, `WorldNavigation`, `ResourceManager`, streamed NPCs/spawns, and an environment adapter. A 3×3 active chunk ring drives rendering and simulation activation; terrain chunks cache only a bounded number of inactive render groups. The World Tree is a permanent hub landmark, while adjacent world content remains streamable. Details are documented in `rpg/WORLD.md`.
+## Phase 3: action combat
 
-## Phase 3 extension: real-time combat
+`CombatService` owns declarative actions, hit detection, targeting, AI callbacks, damage resolution, status effects, and combat feedback. `SpawnManager` owns enemy AI. Combat sends only action/target IDs over the demo intent boundary and emits semantic events rather than managing RPG rewards.
 
-Phase 3 preserves the existing `CombatService` boundary and extends it with declarative action data, hit detection, elemental damage calculation, status effects, target locking, generated audio feedback, and a stream-safe enemy AI state machine. `SpawnManager` owns `EnemyAiSystem` instances rather than embedding AI branches in the World Manager. Boss phases and enemy pattern data remain in `data/combat-data.js`; renderer feedback is still isolated in `SceneRenderer`. The action intent contract sends only action/target IDs to the demo server — it never trusts client damage or rewards. Details are documented in `rpg/COMBAT.md`.
+## Phase 4: RPG vertical loop
 
-## Extension sequence
-
-1. Move declarative content from the current module into schema-validated JSON bundles and build authoring/import tests.
-2. Implement a real authoritative simulation service with account/session identity, persistence, spatial queries, server-side damage/cooldowns, snapshots, and reconciliation.
-3. Add zone streaming plus instance/dungeon contracts, then a boss encounter state machine.
-4. Add equipment stats, NPC dialogue graph tooling, localization, audio, accessibility, analytics, automated gameplay tests, asset pipeline, and live-ops configuration.
-
-## Phase 4 extension: RPG vertical loop
-
-Phase 4 keeps Phase 3 combat intact and adds a content-driven gameplay layer in `rpg/src/data/rpg-content.js`. The composition root now wires seven focused services rather than making combat a reward God Object:
-
-- `CharacterStats` owns base attributes, source-keyed modifiers, derived combat-compatible aliases, XP/level progression, and skill-readiness state.
-- `InventoryManager` owns bounded ID/instance slots; `EquipmentManager` moves real instances into seven slots and applies modifier sources.
-- `LootSystem` creates validated weighted drop plans; `RewardService` subscribes to defeat, quest-turn-in, dungeon-complete, and resource events to apply configured reward records.
-- `QuestManager` tracks the available/active/ready/completed state machine; `NPCManager` exposes dialogue choices that request accept/turn-in/shop operations.
-- `ShopService` resolves catalog prices and sell rules from immutable content, never from UI values.
-- `DungeonService` validates Sanctum entry and tells `SpawnManager` whether its elite/boss encounter spawns are eligible.
-- `SaveManager` writes version 2 snapshots; `data-validation.js` migrates the old map inventory and clamps/filters untrusted browser storage.
-
-The data/event shape is intentionally server-compatible: network action intents allow identifiers only. XP, Gold, inventory item IDs/quantities, loot, quest completion, and equipment modifiers are absent from the wire contract and the Python gateway rejects unexpected fields. The offline demo remains a local simulation; an authoritative production service must replace the `RewardService` resolution seam and retain account/session state server-side.
-
-### Event flow
+Phase 4 added data-driven progression, bounded item-ID/instance inventory, seven-slot modifier equipment, weighted loot planning, reward application, Gold/shop service, quest state machine, NPC choices, Aurel Sanctum gating, save-v2 migration, and live RPG UI.
 
 ```text
 CombatService -- combat:enemy-defeated --> RewardService / QuestManager / DungeonService
@@ -57,4 +31,30 @@ DungeonService -- dungeon:completed -----> RewardService
 RewardService -- player:progress --------> HUD / save / modal UI
 ```
 
-This fan-out preserves low coupling: combat knows hit/death presentation, while progression systems independently respond to outcomes.
+## Phase 5: presentation and immersion layer
+
+Phase 5 does not rewrite Phase 3/4 systems. It adds observer-style services and renderer-side adapters:
+
+```text
+Existing gameplay events
+  ├─ CharacterAnimator + AnimationStateMachine
+  │    semantic clip states, transition priority, cancel/lock timeline, root-motion/event seam
+  ├─ VfxDirector + effect manifest
+  │    effect IDs → bounded pooled renderer effects
+  ├─ AudioService + audio manifest
+  │    cue IDs → Master/Music/SFX/Combat/UI/Ambient/Voice routing
+  ├─ CameraDirector
+  │    follow/lag, right-mouse orbit, lock/boss framing, FOV/distance, registered collision raycasts
+  └─ RewardPresentation / TransitionUI / GuidanceUI / DebugPanel
+       presentation-only DOM, transitions, next-step guidance, development telemetry
+```
+
+`PresentationSettings` persists to an independent local preference key. It must never alter player progression/save-v2 authority. `SceneRenderer` owns original procedural World Tree Plaza districts, visual effects, light/fog profiles, and startup-safe camera presentation. Camera colliders are registered meshes rather than full-scene raycasts, avoiding an avoidable per-frame streaming cost.
+
+The audio architecture currently uses synthesized cues and silent music-state transitions because no final audio assets ship. The animation controller currently drives semantic/procedural fallback posing and is explicitly clip-ready rather than claiming to contain authored animation clips.
+
+## Production extension sequence
+
+1. Add authenticated authoritative simulation, persistence, server-side spatial/cooldown/reward checks, and reconciliation.
+2. Bind authored GLTF animation clips, root motion, portraits, environment assets, VFX textures, and licensed audio to existing semantic IDs.
+3. Add authored collision volumes/occlusion tests, automated WebGL visual regression capture, accessibility QA, asset pipeline, telemetry, and live-ops tooling.

@@ -1,4 +1,4 @@
-# Ashenwild Frontier — Browser Action RPG Vertical Slice
+# Ashenwild Frontier — Browser Action RPG Presentation Slice
 
 Ashenwild Frontier is an original, browser-playable third-person action RPG foundation. It does not copy the archived prototype's UI, maps, characters, icons, or gameplay logic: scenes use procedural geometry and the Phase-4 content is authored specifically for this project.
 
@@ -18,7 +18,7 @@ The dependency-free host serves the client and a validated `/api/action` intent 
 | Action | Keys |
 | --- | --- |
 | Move / sprint | `WASD` or arrows / `Left Shift` |
-| Light combo, heavy, Rift Lance | mouse / `1`, `2`, `3` |
+| Camera orbit / light combo, heavy, Rift Lance | right-mouse drag / left mouse / `1`, `2`, `3` |
 | Dew vial, dodge, guard/parry | `4`, `Q`, `F` |
 | Target lock / cycle / ultimate | `R`, `T`, `V` |
 | Interact / dialogue choices | `E`, then click a choice |
@@ -26,7 +26,11 @@ The dependency-free host serves the client and a validated `/api/action` intent 
 | Map / fast travel | `M` |
 | Menu / debug | `Esc` / `F3` |
 
-## Playable Phase-4 loop
+## Playable Phase-5 presentation loop
+
+The Phase 4 loop now has a stronger presentation layer: a landmarked World Tree hub, district lighting/signage/path guidance, smooth third-person camera with right-mouse orbit and registered-collider avoidance, combat/reward/boss feedback, settings, transition veil, test hooks, and startup failure fallback. These layers subscribe to existing gameplay events; they do not replace the RPG systems below.
+
+## Playable RPG loop
 
 1. Speak with **Watcher Arin** at the Worldroot Plaza and accept the Thornwatch hunt.
 2. Defeat five Thornwalkers in the field. Combat emits confirmed defeat events; reward, quest, dungeon, and progression systems subscribe independently.
@@ -50,7 +54,11 @@ src/
   combat/               preserved action combat, hit detection, feedback, AI
   world/                streaming, NPC/resource interaction, gated spawns
   save/                 v1→v2 validation/migration
-  ui/                   HUD, live modals, dialogue choices
+  ui/                   HUD, live modals, dialogue choices, reward/transition/guidance UI
+  presentation/         settings and semantic animation controller seam
+  audio/                routed cue IDs, channels, music-state seam
+  vfx/                  event-to-effect ID presentation mapping
+  renderer/             procedural scene, streamed LOD, camera collision/follow rig
   network/              restrictive intent contract and remote adapter
 ```
 
@@ -64,10 +72,11 @@ src/
 - [Quests & NPCs](./QUESTS.md)
 - [Dungeon](./DUNGEONS.md)
 - [Economy](./ECONOMY.md)
+- [Presentation](./PRESENTATION.md), [UI system](./UI_SYSTEM.md), [Camera](./CAMERA.md), [Audio](./AUDIO.md), and [VFX](./VFX.md)
 - [Combat](./COMBAT.md) and [World](./WORLD.md)
 
 ## Authority and known boundaries
 
 The Python endpoint rejects client-supplied damage, XP, Gold, items, loot, quest, and equipment-stat fields; it is an intent gateway, not a full online game server. The included single-player browser loop is still an offline local simulation, so browser state/localStorage is not anti-cheat secure. `RewardService` and `RemoteClient` are deliberately narrow seams for a future authenticated server that resolves rewards, persistence, spatial state, cooldowns, and reconciliation.
 
-No browser automation/WebGL runtime is bundled in this checkout. Run the deterministic system-flow coverage with `node --experimental-default-type=module rpg/tests/phase4-rpg-flow.mjs`; it covers progression, inventory/equipment, weighted loot, quests, dungeon gates, shop transactions, save migration/reload, and invalid reward/item/quantity attempts. Static module checks and HTTP authority/asset checks complement it.
+No browser automation/WebGL runtime is bundled in this checkout. Run `node --experimental-default-type=module rpg/tests/phase4-rpg-flow.mjs` for RPG flow and `node --experimental-default-type=module rpg/tests/phase5-presentation.mjs` for settings validation, semantic animation states, audio/VFX manifests, and stable UI selector coverage. Static module checks, import resolution, and HTTP asset/authority checks complement them. Interactive WebGL visual QA was not executed.

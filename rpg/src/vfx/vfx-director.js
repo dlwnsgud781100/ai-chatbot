@@ -1,0 +1,9 @@
+import { EVENT } from '../core/constants.js';
+import { EFFECTS } from './effect-manifest.js';
+
+/** Event-to-effect presentation mapping; renderer enforces pools/budgets. */
+export class VfxDirector {
+  constructor({events,renderer,settings}){this.events=events;this.renderer=renderer;this.settings=settings;this.active=0;this.bind();}
+  bind(){this.events.on(EVENT.COMBAT_STATE,({state,action})=>{if(state==='dodge')this.play('effect.player.dodge',{position:this.renderer.player.position});else if(state==='attack'&&action){const id=action.id==='ultimate'?'effect.player.ultimate':action.id==='rift'?'effect.player.skill.lightning':action.id==='heavy'?'effect.player.attack.heavy':'effect.player.attack.slash';this.play(id,{position:this.renderer.player.position});}});this.events.on(EVENT.DAMAGE,({source,target,kind,critical})=>{const effectId=EFFECTS[`effect.impact.${kind}`]?`effect.impact.${kind}`:'effect.impact.physical';if(source==='player'&&target!=='player')this.play(effectId,{position:target.position,critical});else if(target==='player')this.play(effectId,{position:this.renderer.player.position});});this.events.on('combat:perfect-parry',()=>this.play('effect.player.parry',{position:this.renderer.player.position}));this.events.on(EVENT.BOSS_PHASE,({boss})=>this.play('effect.boss.phase',{position:boss.position}));this.events.on(EVENT.REWARD_GRANTED,({items})=>{const rarity=items?.some((entry)=>entry.itemId.includes('aurel'))?'epic':items?.length?'rare':'common';this.play(`effect.reward.${rarity}`,{position:this.renderer.player.position});});}
+  play(id,payload={}){const definition=EFFECTS[id];if(!definition||!this.settings.snapshot().screenEffects)return false;const accepted=this.renderer.playEffect?.(definition,payload);if(accepted)this.active=this.renderer.dynamicEffects?.length??this.active;return Boolean(accepted);}
+}

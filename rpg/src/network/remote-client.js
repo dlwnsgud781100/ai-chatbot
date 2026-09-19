@@ -1,0 +1,7 @@
+import { CONFIG } from '../core/config.js';
+import { validateIntent } from './server-validation.js';
+export class RemoteClient {
+  constructor(events,logger) { this.events=events;this.logger=logger;this.online=false;this.sessionId=crypto.randomUUID?.() ?? `guest-${Date.now()}`;this.lastErrorAt=0; }
+  async connect(){if(!CONFIG.network.enabled)return;try{const response=await fetch(`${CONFIG.network.endpoint}/health`,{signal:AbortSignal.timeout?.(CONFIG.network.timeoutMs)});this.online=response.ok;this.events.emit('network:status',{online:this.online});}catch(error){this.online=false;this.logger.warn('RemoteClient','Authority endpoint unavailable; demo remains local',error);this.events.emit('network:status',{online:false});}}
+  async submit(intent){const validation=validateIntent(intent);if(!validation.valid){this.logger.warn('RemoteClient','Rejected local invalid intent',validation);return {approved:false,...validation};}if(!this.online)return {approved:true,mode:'offline-demo'};try{const response=await fetch(`${CONFIG.network.endpoint}/action`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:this.sessionId,intent})});const result=await response.json();if(!result.approved)this.events.emit('network:rejected',result);return result;}catch(error){if(Date.now()-this.lastErrorAt>5000){this.events.emit('ui:notify',{message:'서버 연결이 지연됩니다. 데모 예측 모드로 계속합니다.',type:'warning'});this.lastErrorAt=Date.now();}return {approved:true,mode:'predicted'};}}
+}

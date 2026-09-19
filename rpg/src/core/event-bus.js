@@ -1,0 +1,8 @@
+export class EventBus {
+  #listeners = new Map();
+  on(event, listener) { if (!this.#listeners.has(event)) this.#listeners.set(event,new Set()); this.#listeners.get(event).add(listener); return () => this.off(event,listener); }
+  once(event, listener) { const off=this.on(event,(payload)=>{off();listener(payload);}); return off; }
+  off(event, listener) { this.#listeners.get(event)?.delete(listener); }
+  emit(event, payload={}) { for (const listener of this.#listeners.get(event) ?? []) { try { listener(payload); } catch (error) { console.error(`[EventBus] ${event} listener failed`, error); } } }
+  clear() { this.#listeners.clear(); }
+}

@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#101712" />
+  <meta name="description" content="Ashenwild Frontier — extensible third-person action RPG foundation" />
+  <title>Ashenwild Frontier · RPG Foundation</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div id="game-root">
+    <canvas id="game-canvas" aria-label="Ashenwild Frontier 3D game view"></canvas>
+
+    <div id="screen-vignette" aria-hidden="true"></div>
+    <div id="hit-flash" aria-hidden="true"></div>
+    <div id="crosshair" aria-hidden="true"><span></span></div>
+
+    <header class="topbar hud-panel">
+      <div class="region-card">
+        <span class="eyebrow">CURRENT FRONTIER</span>
+        <strong id="zone-name">잔향의 초원</strong>
+        <small id="zone-subtitle">Whispering Verge · 안전 지대</small>
+      </div>
+      <div class="objective-card">
+        <span class="quest-pulse"></span>
+        <div>
+          <span class="eyebrow">FIELD OBJECTIVE</span>
+          <strong id="objective-title">균열의 경계선</strong>
+          <small id="objective-progress">가시걸음 0 / 3 처치</small>
+        </div>
+      </div>
+      <div class="utility-actions">
+        <button id="sound-button" class="icon-button" type="button" aria-label="사운드 설정" title="사운드 설정">◒</button>
+        <button id="menu-button" class="icon-button" type="button" aria-label="메뉴" title="메뉴 (Esc)">☰</button>
+      </div>
+    </header>
+
+    <aside class="player-hud hud-panel" aria-label="플레이어 상태">
+      <div class="avatar-frame"><div class="avatar-glyph">✦</div><span id="level-badge">Lv. 1</span></div>
+      <div class="stat-stack">
+        <div class="player-name-row"><strong>리프</strong><span id="player-state">탐험 중</span></div>
+        <div class="bar-row health"><span class="bar-label">HP</span><div class="meter"><i id="health-fill"></i></div><b id="health-text">120 / 120</b></div>
+        <div class="bar-row energy"><span class="bar-label">EN</span><div class="meter"><i id="energy-fill"></i></div><b id="energy-text">80 / 80</b></div>
+        <div class="xp-row"><span>EXP</span><div class="xp-meter"><i id="xp-fill"></i></div><b id="xp-text">0 / 100</b></div>
+      </div>
+    </aside>
+
+    <section id="target-frame" class="target-frame hidden" aria-label="현재 대상">
+      <div class="target-head"><span class="target-mark">◇</span><strong id="target-name">가시걸음</strong><small id="target-level">Lv. 1</small></div>
+      <div class="target-bar"><i id="target-health-fill"></i></div>
+    </section>
+
+    <section id="interaction-prompt" class="interaction-prompt hidden">
+      <kbd>E</kbd><span id="interaction-text">상호작용</span>
+    </section>
+
+    <div id="combat-text-layer" aria-live="polite"></div>
+    <div id="toast-region" aria-live="polite" aria-atomic="false"></div>
+
+    <nav class="quick-actions" aria-label="빠른 메뉴">
+      <button data-panel="inventory" type="button"><span class="keycap">I</span><span>가방</span></button>
+      <button data-panel="quests" type="button"><span class="keycap">J</span><span>의뢰</span></button>
+      <button data-panel="character" type="button"><span class="keycap">C</span><span>성장</span></button>
+      <button id="debug-button" type="button"><span class="keycap">F3</span><span>상태</span></button>
+    </nav>
+
+    <section class="skill-dock" aria-label="전투 기술">
+      <button class="skill-slot primary" data-skill="basic" type="button" aria-label="기본 공격, 1 또는 마우스 왼쪽"><span class="slot-key">1</span><span class="skill-icon">⚔</span><span class="skill-name">절단</span><i class="cooldown"></i></button>
+      <button class="skill-slot" data-skill="arcane" type="button" aria-label="균열창, 2"><span class="slot-key">2</span><span class="skill-icon">✧</span><span class="skill-name">균열창</span><i class="cooldown"></i></button>
+      <button class="skill-slot" data-skill="potion" type="button" aria-label="이슬 약병, 3"><span class="slot-key">3</span><span class="skill-icon">♧</span><span class="skill-name">이슬 약병</span><i class="cooldown"></i><b id="potion-count">2</b></button>
+      <button class="skill-slot" data-skill="dodge" type="button" aria-label="회피, Q"><span class="slot-key">Q</span><span class="skill-icon">➜</span><span class="skill-name">회피</span><i class="cooldown"></i></button>
+      <div class="combat-hint"><span><b>WASD</b> 이동</span><span><b>Shift</b> 질주</span><span><b>Space</b> 점프</span></div>
+    </section>
+
+    <div class="mobile-controls" aria-label="터치 컨트롤">
+      <div class="mobile-stick"><span></span></div>
+      <div class="mobile-buttons"><button data-skill="basic">⚔</button><button data-skill="dodge">↝</button><button id="mobile-interact">E</button></div>
+    </div>
+
+    <div id="modal-backdrop" class="modal-backdrop hidden">
+      <section id="game-modal" class="game-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <button id="modal-close" type="button" class="modal-close" aria-label="닫기">×</button>
+        <div class="modal-heading"><span id="modal-kicker">FIELD SYSTEM</span><h2 id="modal-title">가방</h2></div>
+        <div id="modal-content"></div>
+      </section>
+    </div>
+
+    <div id="dialogue-box" class="dialogue-box hidden" role="dialog" aria-live="polite">
+      <div class="speaker-row"><span class="speaker-icon">◈</span><strong id="dialogue-speaker">감시자 아린</strong><span>대화</span></div>
+      <p id="dialogue-text"></p>
+      <small><kbd>E</kbd> 또는 <kbd>Space</kbd> 계속</small>
+    </div>
+
+    <section id="title-screen" class="title-screen">
+      <div class="title-ember ember-a"></div><div class="title-ember ember-b"></div>
+      <div class="title-content">
+        <p class="eyebrow">ORIGINAL WORLD · ONLINE-READY FOUNDATION</p>
+        <h1>ASHENWILD<br><em>FRONTIER</em></h1>
+        <p class="title-copy">불씨가 꺼진 변경에서, 균열을 건너는 길을 개척하라.</p>
+        <button id="start-button" class="start-button" type="button"><span>PLAY FIELD DEMO</span><b>↗</b></button>
+        <div class="start-footnote"><span>세 번째 시점 액션</span><i></i><span>오프라인 데모 · 저장 지원</span></div>
+      </div>
+      <div class="title-controls"><b>WASD</b> 이동 <b>Shift</b> 질주 <b>LMB / 1</b> 공격 <b>E</b> 상호작용</div>
+    </section>
+
+    <div id="death-screen" class="death-screen hidden"><div><span>THE FRONTIER HOLDS ITS BREATH</span><h2>쓰러졌습니다</h2><p>야영지의 불빛이 당신을 다시 부릅니다.</p><button id="respawn-button" type="button">야영지에서 부활</button></div></div>
+
+    <aside id="debug-panel" class="debug-panel hidden" aria-live="polite">
+      <div><strong>DEVELOPER TELEMETRY</strong><button id="debug-close" type="button">×</button></div>
+      <dl><dt>FPS</dt><dd id="debug-fps">--</dd><dt>Entities</dt><dd id="debug-entities">--</dd><dt>Authority</dt><dd id="debug-network">LOCAL PREDICTION</dd><dt>Position</dt><dd id="debug-position">--</dd><dt>Build</dt><dd>foundation-0.1.0</dd></dl>
+    </aside>
+
+    <div id="loading-screen" class="loading-screen"><div class="loader-mark">✦</div><strong>경계 너머를 준비하고 있습니다</strong><span>WORLD BOOTSTRAP · 0%</span><i><b></b></i></div>
+  </div>
+
+  <script type="importmap">
+  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js" } }
+  </script>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

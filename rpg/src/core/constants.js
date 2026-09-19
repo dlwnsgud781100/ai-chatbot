@@ -1,0 +1,5 @@
+export const GAME_STATE = Object.freeze({ LOADING: 'loading', TITLE: 'title', PLAYING: 'playing', DIALOGUE: 'dialogue', MODAL: 'modal', DEAD: 'dead' });
+export const EVENT = Object.freeze({ STATE_CHANGED:'state:changed', PLAYER_CHANGED:'player:changed', ENTITY_SPAWNED:'entity:spawned', ENTITY_REMOVED:'entity:removed', TARGET_CHANGED:'target:changed', NOTIFY:'ui:notify', DAMAGE:'combat:damage', QUEST_CHANGED:'quest:changed', INVENTORY_CHANGED:'inventory:changed', MODAL:'ui:modal', INTERACTION:'world:interaction', DEBUG:'debug:log' });
+export const INPUT = Object.freeze({ FORWARD:['KeyW','ArrowUp'], BACK:['KeyS','ArrowDown'], LEFT:['KeyA','ArrowLeft'], RIGHT:['KeyD','ArrowRight'], SPRINT:'ShiftLeft', JUMP:'Space', DODGE:'KeyQ', INTERACT:'KeyE', ATTACK:'Digit1', ARCANE:'Digit2', POTION:'Digit3', INVENTORY:'KeyI', QUESTS:'KeyJ', CHARACTER:'KeyC', MENU:'Escape', DEBUG:'F3' });
+export const WORLD = Object.freeze({ RESPAWN:{x:-10,z:9}, PLAYER_RADIUS:.52, INTERACTION_RANGE:3, TARGET_RANGE:14, ATTACK_RANGE:3.1, TICK_RATE:20 });
+export const SAVE_VERSION = 1;

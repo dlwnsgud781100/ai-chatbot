@@ -1,0 +1,6 @@
+import { CONFIG } from '../core/config.js';
+export class DebugPanel {
+  constructor({renderer,world,remote,performance}) {this.renderer=renderer;this.world=world;this.remote=remote;this.performance=performance;this.root=document.querySelector('#debug-panel');this.elements={fps:document.querySelector('#debug-fps'),entities:document.querySelector('#debug-entities'),network:document.querySelector('#debug-network'),position:document.querySelector('#debug-position')};document.querySelector('#debug-button').onclick=()=>this.toggle();document.querySelector('#debug-close').onclick=()=>this.toggle(false);if(CONFIG.debug)this.toggle(true);}
+  toggle(force){this.root.classList.toggle('hidden',force===undefined?!this.root.classList.contains('hidden'):!force);}
+  update(){if(this.root.classList.contains('hidden'))return;const p=this.renderer.player.position;this.elements.fps.textContent=String(this.performance.fps||'--');this.elements.entities.textContent=String(this.world.spawns.getAlive().length+this.world.npcs.getAll().length+1);this.elements.network.textContent=this.remote.online?'DEMO ENDPOINT ONLINE':'LOCAL PREDICTION';this.elements.position.textContent=`${p.x.toFixed(1)}, ${p.z.toFixed(1)}`;}
+}

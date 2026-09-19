@@ -37,7 +37,9 @@ class GameRequestHandler(SimpleHTTPRequestHandler):
     def end_headers(self) -> None:
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Cross-Origin-Resource-Policy", "same-origin")
-        self.send_header("Cache-Control", "no-store" if self.path.startswith("/api/") else "public, max-age=300")
+        # The demo host intentionally avoids browser caching so live world-data edits are visible
+        # on a normal preview reload. A production CDN should fingerprint and cache assets instead.
+        self.send_header("Cache-Control", "no-store")
         super().end_headers()
 
     def do_GET(self) -> None:  # noqa: N802
